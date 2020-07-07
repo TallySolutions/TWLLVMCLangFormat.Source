@@ -1,0 +1,2 @@
+D:/Workspaces/TWLLVMCLangFormat.Source/parallel-libs/out/build/x64-Debug/CMakeFiles/edit_cache.dir
+D:/Workspaces/TWLLVMCLangFormat.Source/parallel-libs/out/build/x64-Debug/CMakeFiles/rebuild_cache.dir
