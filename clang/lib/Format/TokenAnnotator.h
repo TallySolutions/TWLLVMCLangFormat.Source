@@ -44,7 +44,7 @@ public:
         MustBeDeclaration(Line.MustBeDeclaration), MightBeFunctionDecl(false),
         IsMultiVariableDeclStmt(false), Affected(false),
         LeadingEmptyLinesAffected(false), ChildrenAffected(false),
-        FirstStartColumn(Line.FirstStartColumn) {
+        FirstStartColumn(Line.FirstStartColumn), /* TALLY */ IsDoubleIndented(false) {
     assert(!Line.Tokens.empty());
 
     // Calculate Next and Previous for all tokens. Note that we must overwrite
@@ -146,6 +146,13 @@ public:
 
   unsigned FirstStartColumn;
 
+  /// TALLY: \c True if this line is additional/double indented
+  bool IsDoubleIndented;
+
+  /// TALLY: Line state for columnarization
+  unsigned LastSpecifierPadding = 0;
+  unsigned LastSpecifierTabs = 0;
+
 private:
   // Disallow copying.
   AnnotatedLine(const AnnotatedLine &) = delete;
@@ -165,7 +172,45 @@ public:
   void setCommentLineLevels(SmallVectorImpl<AnnotatedLine *> &Lines);
 
   void annotate(AnnotatedLine &Line);
+  /// TALLY: Add Tally-specific information to all annotated lines
+  void calculateTallyInformation(AnnotatedLine &Line);
   void calculateFormattingInformation(AnnotatedLine &Line);
+
+  /// TALLY: If a given token is part of a PP conditional inclusion
+  bool IsPPConditionalInclusionScope = false;
+
+  /// TALLY: If a given token is part of a struct scope
+  bool IsStructScope = false;
+
+  /// TALLY: If a given token is part of a union scope
+  bool IsUnionScope = false;
+
+  /// TALLY: If a given token is part of a class scope
+  bool IsClassScope = false;
+
+  /// TALLY: If a given token is part of a enum scope
+  bool IsEnumScope = false;
+
+  /// TALLY: Name of the struct (if any) a given token is scoped under
+  StringRef StructScopeName = "<StructScopeName_None>";
+
+  /// TALLY: Name of the class (if any) a given token is scoped under
+  StringRef ClassScopeName = "<ClassScopeName_None>";
+
+  /// TALLY: L-Brace count
+  unsigned LbraceCount = 0;
+
+  /// TALLY: R-Brace count
+  unsigned RbraceCount = 0;
+
+  /// TALLY: L-Paren count
+  unsigned LparenCount = 0;
+
+  /// TALLY: R-Paren count
+  unsigned RparenCount = 0;
+
+  /// TALLY: A weight to determine whether line break in the original must be enforced
+  unsigned OriginalLineBreakWeight = 0;
 
 private:
   /// Calculate the penalty for splitting before \c Tok.
@@ -188,6 +233,12 @@ private:
   void printDebugInfo(const AnnotatedLine &Line);
 
   void calculateUnbreakableTailLengths(AnnotatedLine &Line);
+
+  // TALLY
+  void walkLine1(AnnotatedLine &Line);
+
+  // TALLY
+  void walkLine2(AnnotatedLine &Line);
 
   const FormatStyle &Style;
 

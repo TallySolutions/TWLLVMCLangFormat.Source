@@ -181,11 +181,47 @@ private:
   /// \brief Align consecutive C/C++ preprocessor macros over all \c Changes.
   void alignConsecutiveMacros();
 
+  /// TALLY: Align consecutive assignments over all \c Changes.
+  void alignConsecutiveAssignmentsOnScopedVarName();
+
+  /// TALLY: Align consecutive assignments over all \c Changes.
+  void alignConsecutiveAssignmentsOnVarNameAcrossSections();
+
+  /// TALLY: Align consecutive assignments over all \c Changes.
+  void alignConsecutiveAssignmentsOnVarNameWithinSection();
+
+  /// TALLY: Align consecutive assignments over all \c Changes.
+  void alignConsecutiveVarBitFields();
+
+  // TALLY: Mutually exclusive with alignConsecutiveAssignmentsOnEqualsWithinSection()
+  void alignConsecutiveAssignmentsOnEqualsAcrossSections();
+
+  // TALLY: Mutually exclusive with alignConsecutiveAssignmentsOnEqualsAcrossSections()
+  void alignConsecutiveAssignmentsOnEqualsWithinSection();
+
   /// Align consecutive assignments over all \c Changes.
   void alignConsecutiveAssignments();
 
   /// Align consecutive bitfields over all \c Changes.
   void alignConsecutiveBitFields();
+
+  /// TALLY: Columnarize specific tokens over all \c Changes.
+  void columnarizePPKeywords();
+
+  /// TALLY: Columnarize specific tokens over all \c Changes.
+  void columnarizePPDefineKeyword();
+
+  /// TALLY: Columnarize specific tokens over all \c Changes.
+  void columnarizeDeclarationSpecifierTokens();
+
+  /// TALLY: Columnarize specific tokens over all \c Changes.
+  void columnarizeDatatypeTokens();
+
+  /// TALLY: Columnarize specific tokens over all \c Changes.
+  void columnarizeIdentifierTokens();
+
+  /// TALLY: Columnarize specific tokens over all \c Changes.
+  void columnarizeLParenTokens();
 
   /// Align consecutive declarations over all \c Changes.
   void alignConsecutiveDeclarations();
@@ -227,6 +263,12 @@ private:
   tooling::Replacements Replaces;
   const FormatStyle &Style;
   bool UseCRLF;
+  // TALLY
+  size_t MaxPPKeywordLen = 0;
+  size_t MaxPPDefineLHSLen = 0;
+  size_t MaxSpecifierTabs = 0;
+  size_t MaxDatatypeLen = 0;
+  size_t MaxMemberNameLen = 0;
 };
 
 } // namespace format

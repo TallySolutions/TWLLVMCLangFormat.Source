@@ -2404,11 +2404,318 @@ bool TokenAnnotator::mustBreakForReturnType(const AnnotatedLine &Line) const {
   return false;
 }
 
+// TALLY: Walk the line
+void TokenAnnotator::walkLine1(AnnotatedLine& Line) {
+    OriginalLineBreakWeight = 0;
+
+    // TALLY: Walk the line in backward direction looking for semi-colon
+    bool hasSemiColon = false;
+    FormatToken* MyToken0 = Line.Last;
+    if (MyToken0) {
+        for (MyToken0 = Line.Last; MyToken0 != nullptr && !hasSemiColon; MyToken0 = MyToken0->Previous) {
+            if (MyToken0->is(tok::semi)) {
+                hasSemiColon = true;
+            }
+        }
+    }
+
+    // TALLY: Walk the line in forward direction
+    FormatToken* MyToken = Line.First;
+    if (MyToken) {
+        for (MyToken = Line.First; MyToken != nullptr; MyToken = MyToken->Next) {
+            // Compute state
+            if (MyToken->isOneOf(tok::kw_class, tok::kw_struct, tok::kw_union, tok::kw_enum)) {
+                if (MyToken->is(tok::kw_class)) {
+                    IsClassScope = true;
+                    const FormatToken* Next = MyToken->getNextNonComment();
+                    if (Next) {
+                        ClassScopeName = Next->TokenText;
+                    }
+                }
+                if (MyToken->is(tok::kw_struct)) {
+                    IsStructScope = true;
+                    const FormatToken* Next = MyToken->getNextNonComment();
+                    if (Next) {
+                        StructScopeName = Next->TokenText;
+                    }
+                }
+                if (MyToken->is(tok::kw_union)) {
+                    IsUnionScope = true;
+                }
+                if (MyToken->is(tok::kw_enum)) {
+                    IsEnumScope = true;
+                }
+            }
+            else if (MyToken->is(tok::l_brace)) {
+                LbraceCount++;
+            }
+            else if (MyToken->is(tok::r_brace)) {
+                RbraceCount++;
+
+                if (RbraceCount == LbraceCount) {
+                    LbraceCount = 0;
+                    RbraceCount = 0;
+
+                    if (IsClassScope) {
+                        IsClassScope = false;
+                    }
+
+                    if (IsStructScope) {
+                        IsStructScope = false;
+                    }
+
+                    if (IsUnionScope) {
+                        IsUnionScope = false;
+                    }
+
+                    if (IsEnumScope) {
+                        IsEnumScope = false;
+                    }
+                }
+            }
+            else if (MyToken->is(tok::l_paren)) {
+                LparenCount++;
+
+                OriginalLineBreakWeight += 2;
+
+                // Add additional weight for a function declaration
+                if (hasSemiColon) {
+                    const FormatToken* MyPrev = MyToken->getPreviousNonComment();
+                    if (MyPrev && MyPrev->isFunctionOrCtorOrPrevIsDtor()) {
+                        OriginalLineBreakWeight += 5;
+                    }
+                }
+            }
+            else if (MyToken->is(tok::r_paren)) {
+                RparenCount++;
+
+                if (RparenCount == LparenCount) {
+                    LparenCount = 0;
+                    RparenCount = 0;
+                }
+            }
+            else if (MyToken->isPPConditionalInclusionStart()) {
+                IsPPConditionalInclusionScope = true;
+            }
+            else if (MyToken->isPPConditionalInclusionEnd()) {
+                IsPPConditionalInclusionScope = false;
+            }
+            else if (MyToken->isOneOf(tok::kw_if, tok::kw_for, tok::kw_while)) {
+                OriginalLineBreakWeight += 5;
+            }
+            else if (MyToken->is(tok::arrow)) {
+                OriginalLineBreakWeight += 2;
+            }
+
+            // Copy state
+            MyToken->MyLine = &Line;
+            MyToken->HasSemiColonInLine = hasSemiColon;
+            MyToken->IsPPConditionalInclusionScope = IsPPConditionalInclusionScope;
+            MyToken->IsClassScope = IsClassScope;
+            MyToken->IsStructScope = IsStructScope;
+            MyToken->IsUnionScope = IsUnionScope;
+            MyToken->IsEnumScope = IsEnumScope;
+            MyToken->StructScopeName = StructScopeName;
+            MyToken->ClassScopeName = ClassScopeName;
+            MyToken->LbraceCount = LbraceCount;
+            MyToken->RbraceCount = RbraceCount;
+            MyToken->LparenCount = LparenCount;
+            MyToken->RparenCount = RparenCount;
+        }
+    }
+
+    // TALLY: Walk the line in forward direction
+    FormatToken* MyToken2 = Line.First;
+    if (MyToken2) {
+        for (MyToken2 = Line.First; MyToken2 != nullptr; MyToken2 = MyToken2->Next) {
+            // Copy state (accumulated weight for all tokens in the line) to all tokens in the line
+            MyToken2->OriginalLineBreakWeight = OriginalLineBreakWeight;
+        }
+    }
+}
+
+// TALLY: Walk the line in forward direction
+void TokenAnnotator::walkLine2(AnnotatedLine& Line) {
+
+    // First loop for 'IsRhsToken'
+    FormatToken* MyToken = Line.First;
+    if (MyToken) {
+        for (MyToken = Line.First; MyToken != nullptr; MyToken = MyToken->Next) {
+            if (MyToken->isNotScoped())
+                continue;
+
+            bool nonAlignasLParen = MyToken->is(tok::l_paren) && MyToken->Previous && !MyToken->Previous->is(tok::kw_alignas);
+
+            if (MyToken->isOneOf(tok::equal, TT_BinaryOperator, TT_UnaryOperator) || MyToken->isMemberAccess() || nonAlignasLParen)
+                break;
+        }
+
+        bool nonAlignasLParen = MyToken && MyToken->is(tok::l_paren) && MyToken->Previous && !MyToken->Previous->is(tok::kw_alignas);
+        if (MyToken && (MyToken->isOneOf(tok::equal, TT_BinaryOperator, TT_UnaryOperator) || MyToken->isMemberAccess() || nonAlignasLParen)) {
+            FormatToken* Next = MyToken->getNextNonCommentNonConst();
+            while (Next) {
+                Next->IsRhsToken = true;
+                Next = Next->getNextNonCommentNonConst();
+            }
+        }
+    }
+
+    // Second loop for 'IsVariableNameWithDatatype', 'IsFunctionName', and 'IsDatatype'
+    FormatToken* DtToken = nullptr;
+    MyToken = Line.First;
+    if (MyToken) {
+        for (MyToken = Line.First; MyToken != nullptr; MyToken = MyToken->Next) {
+            if (MyToken->IsInterimBeforeName || MyToken->IsRhsToken || MyToken->isNotScoped() || MyToken->isParenScoped())
+                continue;
+
+            // Datatype
+            if (MyToken->isDatatypeInner()) {
+                if (DtToken == nullptr)
+                    DtToken = MyToken;
+
+                // Interim
+                FormatToken* Next = MyToken->getNextNonCommentNonConst();
+                if (Next && Next->is(tok::less)) {
+                    Next->IsInterimBeforeName = true;
+                    Next = Next->getNextNonCommentNonConst();
+                    while (Next && !Next->is(tok::greater)) {
+                        Next->IsInterimBeforeName = true;
+                        Next = Next->getNextNonCommentNonConst();
+                    }
+                    if (Next && Next->is(tok::greater)) {
+                        Next->IsInterimBeforeName = true;
+                    }
+                }
+
+                // Interim
+                while (Next && (Next->isOneOf(tok::star, tok::amp) || Next->isPointerOrRef())) {
+                    Next->IsInterimBeforeName = true;
+                    Next = Next->getNextNonCommentNonConst();
+                }
+            }
+
+            if (DtToken != nullptr && MyToken != DtToken) {
+                const FormatToken* Prev = MyToken->getPreviousNonComment();
+                const FormatToken* Next = MyToken->getNextNonComment();
+
+                // Function name
+                if (MyToken->isFunctionName() && Next && Next->is(tok::l_paren)) {
+                    MyToken->IsFunctionName = true;
+                    DtToken->IsDatatype = true;
+                }
+                // Variable name
+                else if (MyToken->is(tok::identifier) && Prev && !Prev->isMemberAccess()) {
+                    bool nextOk = false;
+                    if (Next) {
+                        if (Next->isOneOf(tok::semi, tok::comma, tok::equal)) {
+                            nextOk = true;
+                        }
+                        else if (Next->is(tok::l_brace) && Next->MatchingParen) {
+                            nextOk = true;
+                        }
+                        else if (Next->is(tok::colon)) {
+                            const FormatToken* MyNext2 = Next->getNextNonComment();
+                            if (MyNext2 && MyNext2->is(tok::numeric_constant)) {
+                                nextOk = true;
+                            }
+                        }
+                        else if (Next->is(tok::l_square)) {
+                            const FormatToken* Next2 = Next->getNextNonComment();
+                            // Array size may be tok::numeric_constant or tok::identifier or expression
+                            // containing tok::plus, tok::minus, tok::star etc. so we conservatively look
+                            // for matching tok::r_square only.
+                            while (Next2 && !Next2->is(tok::r_square)) {
+                                Next2 = Next2->getNextNonComment();
+                            }
+                            if (Next2 && Next2->is(tok::r_square)) {
+                                nextOk = true;
+                            }
+                        }
+                        // TODO: Add support for scoped variable name eg. Something::SomethingElse
+                    }
+
+                    if (nextOk) {
+                        MyToken->IsVariableNameWithDatatype = true;
+                        DtToken->IsDatatype = true;
+                    }
+                }
+            }
+        }
+    }
+
+    // Third loop for 'IsVariableNameWithoutDatatype'
+    MyToken = Line.First;
+    if (MyToken) {
+        for (MyToken = Line.First; MyToken != nullptr; MyToken = MyToken->Next) {
+            if (MyToken->IsInterimBeforeName || MyToken->IsRhsToken || MyToken->isNotScoped() || MyToken->isParenScoped())
+                continue;
+
+            // Identifier
+            if (!MyToken->IsDatatype && MyToken->is(tok::identifier)) {
+
+                // Interim
+                FormatToken* Prev = MyToken->getPreviousNonComment();
+                while (Prev && (Prev->isOneOf(tok::star, tok::amp) || Prev->isPointerOrRef())) {
+                    Prev->IsInterimBeforeName = true;
+                    Prev = Prev->getPreviousNonComment();
+                }
+
+                if (Prev == nullptr) {
+                    MyToken->IsVariableNameWithoutDatatype = true;
+                }
+            }
+        }
+    }
+}
+
+/// TALLY: Calculate Tally-specific information for all tokens in all annotated lines 
+// before calculateFormattingInformation()
+void TokenAnnotator::calculateTallyInformation(AnnotatedLine& Line) {
+    for (SmallVectorImpl<AnnotatedLine*>::iterator I = Line.Children.begin(),
+        E = Line.Children.end();
+        I != E; ++I) {
+        calculateTallyInformation(**I);
+    }
+
+    walkLine1(Line);
+    walkLine2(Line);
+}
+
 void TokenAnnotator::calculateFormattingInformation(AnnotatedLine &Line) {
-  for (SmallVectorImpl<AnnotatedLine *>::iterator I = Line.Children.begin(),
-                                                  E = Line.Children.end();
-       I != E; ++I) {
-    calculateFormattingInformation(**I);
+    for (SmallVectorImpl<AnnotatedLine*>::iterator I = Line.Children.begin(),
+        E = Line.Children.end();
+        I != E; ++I) {
+        calculateFormattingInformation(**I);
+    }
+
+    // TALLY: Walk the line in forward direction
+    FormatToken* MyToken = Line.First;
+    bool IsDoubleIndentNeeded = false;
+    if (MyToken) {
+        for (MyToken = Line.First; MyToken != nullptr && IsDoubleIndentNeeded == false; MyToken = MyToken->Next) {
+            if (MyToken->IsVariableNameWithDatatype ||
+                MyToken->isTallyTrace())
+            {
+                IsDoubleIndentNeeded = true;
+                break;
+            }
+        }
+    }
+
+    /// TALLY: We have a variable name in declaration. Filter out cases in control statements and scoped in struct or union.
+    if (IsDoubleIndentNeeded) {
+        // Walk back to last non-comment token
+        FormatToken* SemiToken = Line.Last;
+        while (SemiToken && SemiToken->is(tok::comment)) {
+            SemiToken = SemiToken->Previous;
+        }
+        bool IsLastSemi = SemiToken && SemiToken->is(tok::semi);
+
+        bool IsStructOrUnion = (MyToken->IsStructScope || MyToken->IsUnionScope);// && (!MyToken->IsClassScope || !MyToken->IsStructScope));
+        if (IsLastSemi && !(IsStructOrUnion || MyToken->isParenScoped() || MyToken->isNotScoped())) {
+            Line.IsDoubleIndented = true;
+            ++Line.Level;
+        }
   }
 
   Line.First->TotalLength =
@@ -2956,7 +3263,7 @@ bool TokenAnnotator::spaceRequiredBetween(const AnnotatedLine &Line,
              Left.is(tok::r_paren) || Left.isSimpleTypeSpecifier() ||
              (Left.is(tok::r_square) && Left.MatchingParen &&
               Left.MatchingParen->is(TT_LambdaLSquare))) &&
-            Line.Type != LT_PreprocessorDirective);
+            Line.Type != LT_PreprocessorDirective && !Line.InPPDirective); // TALLY: Add && !Line.InPPDirective
   }
   if (Left.is(tok::at) && Right.Tok.getObjCKeywordID() != tok::objc_not_keyword)
     return false;
@@ -3528,12 +3835,27 @@ bool TokenAnnotator::mustBreakBefore(const AnnotatedLine &Line,
       Right.Previous->MatchingParen->NestingLevel == 0 &&
       Style.AlwaysBreakTemplateDeclarations == FormatStyle::BTDS_Yes)
     return true;
+	
+  // TALLY: Always have a break after tok::r_brace and before tok::kw_break
+  if (Left.is(tok::r_brace) && Right.is(tok::kw_break))
+    return true;
+  // TALLY: Add checks for Left also
+  if (Left.is(TT_CtorInitializerComma) &&
+    Style.BreakConstructorInitializers != FormatStyle::BCIS_BeforeComma &&
+    !Style.ConstructorInitializerAllOnOneLineOrOnePerLine)
+    return true;
+  // TALLY: Add checks for Left also
+  if (Left.is(TT_CtorInitializerColon) &&
+    Style.BreakConstructorInitializers == FormatStyle::BCIS_AfterColon &&
+    !Style.ConstructorInitializerAllOnOneLineOrOnePerLine)
+    return true;
+	
   if (Right.is(TT_CtorInitializerComma) &&
       Style.BreakConstructorInitializers == FormatStyle::BCIS_BeforeComma &&
       !Style.ConstructorInitializerAllOnOneLineOrOnePerLine)
     return true;
   if (Right.is(TT_CtorInitializerColon) &&
-      Style.BreakConstructorInitializers == FormatStyle::BCIS_BeforeComma &&
+      Style.BreakConstructorInitializers == FormatStyle::BCIS_BeforeColon && // TALLY: Fix typo: BCIS_BeforeComma should be BCIS_BeforeColon
       !Style.ConstructorInitializerAllOnOneLineOrOnePerLine)
     return true;
   // Break only if we have multiple inheritance.

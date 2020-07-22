@@ -331,6 +331,567 @@ struct FormatToken {
   /// changes.
   bool Finalized = false;
 
+  /// TALLY: Whether the token is part of a line which contains a semi-colon
+  bool HasSemiColonInLine = false;
+
+  /// TALLY: Token size for columnarization
+  size_t PrevTokenSizeForColumnarization = 0;
+
+  /// TALLY: If this token is part of a PP conditional inclusion
+  bool IsPPConditionalInclusionScope = false;
+
+  /// TALLY: If this token is part of a struct scope
+  bool IsStructScope = false;
+
+  /// TALLY: If this token is part of a union scope
+  bool IsUnionScope = false;
+
+  /// TALLY: If this token is part of a class scope
+  bool IsClassScope = false;
+
+  /// TALLY: If this token is part of a enum scope
+  bool IsEnumScope = false;
+
+  /// TALLY: Name of the struct (if any) this token is scoped under
+  StringRef StructScopeName = "<StructScopeName_None>";
+
+  /// TALLY: Name of the class (if any) this token is scoped under
+  StringRef ClassScopeName = "<ClassScopeName_None>";
+
+  /// TALLY: L-Brace count
+  unsigned LbraceCount = 0;
+
+  /// TALLY: R-Brace count
+  unsigned RbraceCount = 0;
+
+  /// TALLY: L-Paren count
+  unsigned LparenCount = 0;
+
+  /// TALLY: R-Paren count
+  unsigned RparenCount = 0;
+
+  /// TALLY: A weight to determine whether line break in the original must be enforced
+  unsigned OriginalLineBreakWeight = 0;
+
+  /// TALLY: The owning line
+  AnnotatedLine* MyLine = nullptr;
+
+  /// TALLY: If this token is a datatype
+  bool IsDatatype = false;
+
+  /// TALLY: If this token in an interim token between a datatype and variable name
+  bool IsInterimBeforeName = false;
+
+  /// TALLY: If this token in a RHS token after an equals, unary/binary operator or member access
+  bool IsRhsToken = false;
+
+  /// TALLY: If this token in a variable name with datatype
+  bool IsVariableNameWithDatatype = false;
+
+  /// TALLY: If this token in a variable name without datatype
+  bool IsVariableNameWithoutDatatype = false;
+
+  /// TALLY: If this token in a function name
+  bool IsFunctionName = false;
+
+  // TALLY: Previous non-comment token is
+  bool prevNonCommIs(tok::TokenKind Kind) const {
+      FormatToken* prevNonComm = getPreviousNonComment();
+      return (prevNonComm && prevNonComm->is(Kind));
+  }
+  
+  // TALLY: Helper function
+  bool isPPKeywordAndPrevHash() const {
+      const FormatToken* MyPrev = getPreviousNonComment();
+      if (MyPrev && MyPrev->is(tok::hash)) {
+          return isOneOf(
+              tok::pp_if, tok::pp_ifdef, tok::pp_ifndef,
+              tok::pp_elif, tok::pp_else, tok::pp_endif,
+              tok::pp_defined, tok::pp_include, tok::pp___include_macros,
+              tok::pp_define, tok::pp_undef, tok::pp_error,
+              tok::pp_pragma
+          );
+      }
+      else {
+          return false;
+      }
+  }
+
+  // TALLY: Helper function
+  bool isPPDefineKeywordAndPrevHash() const {
+      const FormatToken* MyPrev = getPreviousNonComment();
+      if (MyPrev && MyPrev->is(tok::hash)) {
+          return is(tok::pp_define);
+      }
+      else {
+          return false;
+      }
+  }
+
+  // TALLY: Helper function
+  bool isPPConditionalInclusionStart() const {
+      //return false;
+      // True for '#' preceding and there-on
+      const FormatToken* MyNext = getNextNonComment();
+      return MyNext && MyNext->isOneOf(tok::pp_if, tok::pp_ifdef, tok::pp_ifndef);
+  }
+
+  // TALLY: Helper function
+  bool isPPConditionalInclusionEnd() const {
+      return is(tok::pp_endif);
+  }
+
+  // TALLY: Helper function
+  bool isTallyMemMgrMacro() const {
+      return
+          TokenText.startswith("NO_POOL") ||
+          TokenText.startswith("USE_MALLOC_POOL") ||
+          TokenText.startswith("USE_CALLOC_POOL");
+  }
+
+  // TALLY: Helper function
+  bool isTallyTrace() const {
+      return TokenText.startswith("TRACEFUNC");
+  }
+
+  // TALLY: Helper function
+  bool isFunctionName() const {
+      bool startOfName = false;
+      if (is(TT_StartOfName)) {
+          startOfName = true;
+          if (TokenText.contains("WINAPI")) {
+              startOfName = strcmp(TokenText.begin(), "WINAPI") == 0;
+          }
+      }
+      bool rc = (startOfName || is(TT_FunctionDeclarationName) || is(tok::kw_operator));
+      return rc;
+  }
+
+  // TALLY: Helper function
+  bool isPointerOrRef() const {
+      return is(TT_PointerOrReference);
+  }
+
+  // TALLY: Helper function
+  bool isLeftParen() const {
+      return is(tok::l_paren);
+  }
+
+  // TALLY: Helper function
+  // Type specifiers
+  // TODO: Add support for C++ attributes like '[[nodiscard]]'
+  bool isDatatypeInner() const {
+      return (is(tok::identifier) || isSimpleTypeSpecifier() || is(tok::kw_auto)) &&
+          !(TokenText.startswith("CALLOC") ||
+              TokenText.startswith("MALLOC") ||
+              TokenText.startswith("WINAPI") ||
+              TokenText.startswith("nodiscard"));
+  }
+
+  // TALLY: Helper function
+  // TODO: 'consteval', 'constinit'
+  bool isDeclarationSpecifier() const {
+      return (isOneOf(
+          tok::kw_static, tok::kw_virtual, tok::kw_inline,
+          tok::kw_friend, tok::kw_volatile, tok::kw_const,
+          tok::kw_constexpr, tok::kw_explicit, tok::kw_register,
+          tok::kw_thread_local, tok::kw_extern, tok::kw_mutable,
+          tok::kw_alignas
+      )) ? true : false;
+  }
+
+  // TALLY: Helper function
+  bool isDeclSpecStaticOrVirtual() const {
+      return (isOneOf(tok::kw_static, tok::kw_virtual)) ? true : false;
+  }
+
+  // TALLY: Helper function
+  bool isDatatype() const {
+      if (!isDeclarationSpecifier()) {
+          return isDatatypeInner();
+      }
+      else {
+          // Declaration specifiers should precede datatype, but occasionally could be after datatype
+          FormatToken* MyPrev = getPreviousNonComment();
+          return (MyPrev) ? MyPrev->isDatatypeInner() : false;
+      }
+  }
+
+  // TALLY: Helper function
+  bool isPointerOrRefOrDatatypeOrKeyword() const {
+      return (isPointerOrRef() || isDatatype() || TokenText.startswith("WINAPI"));
+  }
+
+  // TALLY: Helper function
+  bool isFunctionNameAndPrevIsPointerOrRefOrDatatype() const {
+      FormatToken* MyPrev = getPreviousNonComment();
+      return (isFunctionAndNextLeftParen() && MyPrev != nullptr && MyPrev->isPointerOrRefOrDatatypeOrKeyword());
+  }
+
+  // TALLY: Helper function
+  bool isClassOrStructNamed() const {
+      return
+          (IsClassScope && TokenText.startswith(ClassScopeName))
+          ||
+          (IsStructScope && TokenText.startswith(StructScopeName));
+  }
+
+  // TALLY: Helper function
+  bool isConstructor() const {
+      const FormatToken* MyPrev = getPreviousNonComment();
+      const FormatToken* MyNext = getNextNonComment();
+      if (MyPrev && MyPrev->is(tok::tilde)) {
+          return false;
+      }
+      bool rc = isClassOrStructNamed() && LbraceCount > 0 && MyNext && MyNext->is(tok::l_paren);
+      return rc;
+  }
+
+  // TALLY: Helper function
+  bool isDestructor() const {
+      const FormatToken* MyNext = getNextNonComment();
+      if (is(tok::tilde) && MyNext) {
+          const FormatToken* MyNextNext = MyNext->getNextNonComment();
+          bool rc = MyNext->isClassOrStructNamed() && MyNext->LbraceCount > 0 && MyNextNext && MyNextNext->is(tok::l_paren);
+          return rc;
+      }
+      return false;
+  }
+
+  // TALLY: Helper function
+  bool isFunctionOrCtorOrDtor() const {
+      bool rc =
+          isFunctionNameAndPrevIsPointerOrRefOrDatatype() ||
+          isConstructor() ||
+          isDestructor();
+      return rc;
+  }
+
+  // TALLY: Helper function
+  bool isFunctionOrCtorOrPrevIsDtor() const {
+      const FormatToken* MyPrev = getPreviousNonComment();
+      bool rc =
+          isFunctionNameAndPrevIsPointerOrRefOrDatatype() ||
+          isConstructor() ||
+          (MyPrev && MyPrev->isDestructor());
+      return rc;
+  }
+
+  // TALLY: Helper function
+  bool isPrevBeforeInterimsVarWithoutDatatype() const {
+      const FormatToken* MyPrev = getPreviousNonComment();
+      while (MyPrev && !MyPrev->IsVariableNameWithoutDatatype) {
+          MyPrev = MyPrev->getPreviousNonComment();
+      }
+      return (MyPrev && MyPrev->IsVariableNameWithoutDatatype);
+  }
+
+  // TALLY: Is the previous or previous-to-previous token a variable name without datatype
+  bool isPrevOrPrev2VarWithoutDatatype() const {
+      const FormatToken* MyPrev = getPreviousNonComment();
+      if (MyPrev == nullptr) {
+          return false;
+      }
+
+      const FormatToken* MyPrev2 = MyPrev->getPreviousNonComment();
+      if (MyPrev->IsVariableNameWithoutDatatype || MyPrev2 == nullptr) {
+          return true;
+      }
+
+      if (MyPrev2 && MyPrev2->IsVariableNameWithoutDatatype) {
+          return true;
+      }
+
+      return false;
+  }
+
+  // TALLY: Is this token a variable name without datatype.
+  /*
+  bool isVarNameWithoutDatatype() const {
+    bool prevOk = false;
+    bool nextOk = false;
+    if (is(tok::identifier)) {
+      const FormatToken* MyPrev = getPreviousNonComment();
+      if (MyPrev == nullptr) {
+        prevOk = true;
+      }
+      else {
+        // Star shall be isPointerOrRef() but could also be TT_UnaryOperator instead, so
+        // explicitly check for tok::star also
+        if (MyPrev->isPointerOrRef() || MyPrev->is(tok::star)) {
+          const FormatToken* MyPrev2 = MyPrev->getPreviousNonComment();
+          if (MyPrev2 == nullptr) {
+            prevOk = true;
+          }
+          else if (!MyPrev2->isDatatype()) {
+            prevOk = true;
+          }
+        }
+        else if (!MyPrev->isDatatype()) {
+          prevOk = true;
+        }
+      }
+      // Next may be tok::equal or next-to-next (eg. *pointer++ = something)
+      const FormatToken* MyNext = getNextNonComment();
+      if (MyNext) {
+        if (MyNext->is(tok::equal)) {
+          nextOk = true;
+        }
+        else {
+          const FormatToken* MyNext2 = MyNext->getNextNonComment();
+          if (MyNext2->is(tok::equal)) {
+            nextOk = true;
+          }
+        }
+      }
+    }
+    return prevOk && nextOk;
+  }
+  */
+
+  // TALLY: Helper function
+  bool isFunctionAndNextLeftParen() const {
+      const FormatToken* MyNext = getNextNonComment();
+      if (MyNext) {
+          return isFunctionName() && MyNext->isLeftParen();
+      }
+      return false;
+  }
+
+  // TALLY: Helper function
+  bool isFunctionNameAfterInterims() const {
+      if (IsFunctionName)
+          return true;
+
+      const FormatToken* MyNext = getNextNonComment();
+
+      while (MyNext && MyNext->IsInterimBeforeName) {
+          MyNext = MyNext->getNextNonComment();
+      }
+
+      if (MyNext && MyNext->IsFunctionName)
+          return true;
+
+      return false;
+  }
+
+  // TALLY: Helper function
+  bool isMemberVariableNameAfterInterims() const {
+      if (isMemberVarNameInDecl())
+          return true;
+
+      const FormatToken* MyNext = getNextNonComment();
+
+      while (MyNext && MyNext->IsInterimBeforeName) {
+          MyNext = MyNext->getNextNonComment();
+      }
+
+      if (MyNext && MyNext->isMemberVarNameInDecl())
+          return true;
+
+      return false;
+  }
+
+  // TALLY: Helper function
+  /*
+  bool isFunctionAndNextLeftParenAfterZeroOrMoreInterimTokensInLine() const {
+      if (isFunctionAndNextLeftParen())
+          return true;
+
+      const FormatToken* MyNext = getNextNonComment();
+
+      if (MyNext && MyNext->isFunctionAndNextLeftParen())
+          return true;
+
+      while (MyNext && !MyNext->isFunctionAndNextLeftParen()) {
+          if (MyNext->isOneOf(tok::star, tok::amp, tok::l_square, tok::r_square, tok::numeric_constant) || MyNext->isPointerOrRef()) {
+              MyNext = MyNext->getNextNonComment();
+              if (MyNext && MyNext->isFunctionAndNextLeftParen())
+                  return true;
+          }
+          else {
+              return false;
+          }
+      }
+
+      return false;
+  }
+  */
+
+  // TALLY: Helper function
+  bool isPointerOrRefAndNextIsFunctionAndNextNextLeftParen() const {
+      const FormatToken* MyNext = getNextNonComment();
+      if (MyNext) {
+          return isPointerOrRef() && MyNext->isFunctionAndNextLeftParen();
+      }
+      return false;
+  }
+
+  // TALLY: Helper function
+  /*
+  bool isMemberVarNameInDeclAfterZeroOrMoreInterimTokensInLine() const {
+      if (isMemberVarNameInDecl())
+          return true;
+
+      const FormatToken* MyNext = getNextNonComment();
+
+      if (MyNext && MyNext->isMemberVarNameInDecl())
+          return true;
+
+      if (is(tok::less)) {
+          while (MyNext && !MyNext->is(tok::greater)) {
+              MyNext = MyNext->getNextNonComment();
+          }
+          if (MyNext && MyNext->is(tok::greater)) {
+              MyNext = MyNext->getNextNonComment();
+              return MyNext->isMemberVarNameInDecl();
+          }
+      }
+      else {
+          while (MyNext && !MyNext->isMemberVarNameInDecl()) {
+              if (MyNext->isOneOf(tok::star, tok::amp, tok::l_square, tok::r_square, tok::numeric_constant) || MyNext->isPointerOrRef()) {
+                  MyNext = MyNext->getNextNonComment();
+                  if (MyNext && MyNext->isMemberVarNameInDecl())
+                      return true;
+              }
+              else {
+                  return false;
+              }
+          }
+      }
+
+      return false;
+  }
+  */
+
+  // TALLY: Is this token a class or struct member variable name
+  bool isMemberVarNameInDecl() const {
+      if (!HasSemiColonInLine || (!(IsClassScope || IsStructScope)) || LbraceCount == 0)
+          return false;
+
+      return IsVariableNameWithDatatype;
+  }
+
+  // TALLY: Is this token a non-member (local) variable name
+  bool isNonMemberVarNameInDecl() const {
+      if (!HasSemiColonInLine || IsClassScope || IsStructScope || LbraceCount == 0)
+          return false;
+
+      return IsVariableNameWithDatatype;
+  }
+
+  // TALLY: Is this token a variable name, with an earlier token being
+  // pointer or reference or data type, and following token being a
+  // semi-colon, equals, square left bracket, comma, parens, braces or colon.
+  bool isVarNameInDecl() const {
+      if (isMemberVarNameInDecl())
+          return false;
+
+      bool prevOk = false;
+      bool nextOk = false;
+      if (is(tok::identifier)) {
+          const FormatToken* MyPrev = getPreviousNonComment();
+          if (MyPrev) {
+              if (MyPrev->isDatatype()) {
+                  prevOk = true;
+              }
+              else if (MyPrev->isPointerOrRef()) {
+                  const FormatToken* MyPrevPrev = MyPrev->getPreviousNonComment();
+                  // Also support pointer-to-pointer i.e. two or more levels of indirection. Suffices to stop after two-level checking.
+                  if (MyPrevPrev && (MyPrevPrev->isDatatype() || MyPrevPrev->isPointerOrRef())) {
+                      prevOk = true;
+                  }
+              }
+          }
+          const FormatToken* MyNext = getNextNonComment();
+          if (MyNext) {
+              if (MyNext->isOneOf(tok::equal, tok::semi, tok::l_square, tok::comma)) {
+                  nextOk = true;
+              }
+              if (!IsClassScope && MyNext->is(tok::l_paren) && MyNext->MatchingParen) {
+                  nextOk = true;
+              }
+              if (MyNext->is(tok::l_brace) && MyNext->MatchingParen) {
+                  nextOk = true;
+              }
+              if (MyNext->is(tok::colon)) {
+                  const FormatToken* MyNext2 = MyNext->getNextNonComment();
+                  if (MyNext2 && MyNext2->is(tok::numeric_constant)) {
+                      nextOk = true;
+                  }
+              }
+          }
+      }
+      else if (is(tok::r_square)) {
+          const FormatToken* MyPrev = getPreviousNonComment();
+          while (MyPrev && !MyPrev->is(tok::l_square)) {
+              MyPrev = MyPrev->getPreviousNonComment();
+          }
+          if (MyPrev && MyPrev->is(tok::l_square)) {
+              MyPrev = MyPrev->getPreviousNonComment();
+              if (MyPrev) {
+                  return MyPrev->isVarNameInDecl();
+              }
+          }
+      }
+
+      return prevOk && nextOk;
+  }
+
+  // TALLY: Is this token a scoped variable name eg. Something::SomethingElse a 
+  bool isScopedVarNameInDecl() const {
+      if (isMemberVarNameInDecl())
+          return false;
+
+      bool prevOk = false;
+      bool nextOk = false;
+      if (is(tok::identifier)) {
+          const FormatToken* MyPrev = getPreviousNonComment();
+          if (MyPrev) {
+              if (MyPrev->isDatatype()) {
+                  prevOk = true;
+              }
+              else if (MyPrev->isPointerOrRef()) {
+                  const FormatToken* MyPrevPrev = MyPrev->getPreviousNonComment();
+                  if (MyPrevPrev && MyPrevPrev->isDatatype()) {
+                      prevOk = true;
+                  }
+              }
+          }
+          const FormatToken* MyNext = getNextNonComment();
+          if (MyNext) {
+              if (MyNext->is(tok::coloncolon)) {
+                  const FormatToken* MyNext2 = MyNext->getNextNonComment();
+                  if (MyNext2) {
+                      const FormatToken* MyNext3 = MyNext2->getNextNonComment();
+                      if (MyNext3->isOneOf(tok::equal, tok::semi, tok::l_square, tok::comma)) {
+                          nextOk = true;
+                      }
+                  }
+              }
+          }
+      }
+      return prevOk && nextOk;
+  }
+
+  /// TALLY: Helper function
+  bool isParenScoped() const {
+      return (LparenCount - RparenCount == 1);
+  }
+
+  /// TALLY: Helper function
+  bool isNotScoped() const {
+      return (LbraceCount == 0);
+  }
+
+  /// TALLY: Returns the next token ignoring comments.
+  FormatToken* getNextNonCommentNonConst() const {
+      FormatToken* Tok = Next;
+      while (Tok && Tok->is(tok::comment))
+          Tok = Tok->Next;
+      return Tok;
+  }
+
   bool is(tok::TokenKind Kind) const { return Tok.is(Kind); }
   bool is(TokenType TT) const { return Type == TT; }
   bool is(const IdentifierInfo *II) const {

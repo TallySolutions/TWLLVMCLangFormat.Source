@@ -213,8 +213,10 @@ private:
     if (Style.ColumnLimit > 0 && Indent > Style.ColumnLimit)
       return 0;
 
+	// TALLY: ColumnLimitInEffect
+    unsigned ColumnLimitInEffect = TheLine->InPPDirective ? Style.ColumnLimitExtended : Style.ColumnLimit;
     unsigned Limit =
-        Style.ColumnLimit == 0 ? UINT_MAX : Style.ColumnLimit - Indent;
+        Style.ColumnLimit == 0 ? UINT_MAX : ColumnLimitInEffect - Indent;
     // If we already exceed the column limit, we set 'Limit' to 0. The different
     // tryMerge..() functions can then decide whether to still do merging.
     Limit = TheLine->Last->TotalLength > Limit
@@ -226,6 +228,28 @@ private:
         !Style.BraceWrapping.SplitEmptyFunction &&
         I[1]->First->is(tok::r_brace))
       return tryMergeSimpleBlock(I, E, Limit);
+
+    // TALLY: Try merge Tally Memory Manager macro with left-brace
+    const AnnotatedLine *NextLine = I[1];
+    if (TheLine && TheLine->Last && TheLine->Last->is(tok::l_brace) &&
+      NextLine && NextLine->First && NextLine->First->isTallyMemMgrMacro())
+      return tryMergeSimpleBlock(I, E, UINT_MAX);
+
+    // TALLY: Try merge empty constructor / destructor block
+    // Actual merge happens in tryMergeSimpleBlock() in the lines
+    // after this comment '// We merge empty blocks even if the line exceeds the column limit.'
+    if (TheLine && TheLine->Last && TheLine->Last->is(tok::r_paren) &&
+      NextLine && NextLine->First && NextLine->First->is(tok::l_brace)) {
+      // Get the l_paren from r_paren
+      FormatToken* MatchingParenToken = TheLine->Last->MatchingParen;
+      if (MatchingParenToken != nullptr) {
+        const FormatToken* MyPrev = MatchingParenToken->getPreviousNonComment();
+        const FormatToken* MyPrev2 = MyPrev ? MyPrev->getPreviousNonComment() : nullptr;
+        if ((MyPrev && MyPrev->isConstructor()) || (MyPrev2 && MyPrev2->isDestructor())) {
+          return tryMergeSimpleBlock(I, E, UINT_MAX);
+        }
+      }
+    }
 
     // Handle empty record blocks where the brace has already been wrapped
     if (TheLine->Last->is(tok::l_brace) && TheLine->First == TheLine->Last &&
@@ -570,11 +594,19 @@ private:
 
     if (Line.Last->is(tok::l_brace)) {
       FormatToken *Tok = I[1]->First;
-      if (Tok->is(tok::r_brace) && !Tok->MustBreakBefore &&
+      if (
+        (Tok->is(tok::r_brace) && !Tok->MustBreakBefore &&
           (Tok->getNextNonComment() == nullptr ||
-           Tok->getNextNonComment()->is(tok::semi))) {
+           Tok->getNextNonComment()->is(tok::semi)))
+        || 
+        Tok->isTallyMemMgrMacro()
+        )
+      {
         // We merge empty blocks even if the line exceeds the column limit.
         Tok->SpacesRequiredBefore = Style.SpaceInEmptyBlock ? 1 : 0;
+        // TALLY: Single space between left-brace and the macro
+        if (Tok->isTallyMemMgrMacro())
+          Tok->SpacesRequiredBefore = 1;
         Tok->CanBreakBefore = true;
         return 1;
       } else if (Limit != 0 && !Line.startsWithNamespace() &&
@@ -843,9 +875,17 @@ public:
     LineState State = Indenter->getInitialState(FirstIndent, FirstStartColumn,
                                                 &Line, /*DryRun=*/false);
     while (State.NextToken) {
+      // TALLY: Customized line breaking logic
       bool Newline =
+        State.NextToken->NewlinesBefore > 0 &&
+        (
+          Indenter->mustBreak(State) || 
+          (State.NextToken->OriginalLineBreakWeight > 5 && State.NextToken->isNot(tok::l_brace))
+        );
+/*
           Indenter->mustBreak(State) ||
           (Indenter->canBreak(State) && State.NextToken->NewlinesBefore > 0);
+*/
       unsigned Penalty = 0;
       formatChildren(State, Newline, /*DryRun=*/false, Penalty);
       Indenter->addTokenToState(State, Newline, /*DryRun=*/false);
@@ -1116,6 +1156,18 @@ unsigned UnwrappedLineFormatter::format(
       }
 
       NextLine = Joiner.getNextMergedLine(DryRun, IndentTracker);
+      // TALLY: Always apply NoColumnLimitLineFormatter. Don't apply NoLineBreakFormatter and OptimizingLineFormatter.
+      bool IsFunctionDefinitionLine = TheLine.MightBeFunctionDecl && !TheLine.Last->isOneOf(tok::semi, tok::comment);
+
+      if (IsFunctionDefinitionLine)
+        Penalty += OptimizingLineFormatter(Indenter, Whitespaces, Style, this)
+                       .formatLine(TheLine, NextStartColumn + Indent,
+                                   FirstLine ? FirstStartColumn : 0, DryRun);
+      else
+        NoColumnLimitLineFormatter(Indenter, Whitespaces, Style, this)
+            .formatLine(TheLine, NextStartColumn + Indent,
+              FirstLine ? FirstStartColumn : 0, DryRun);
+/*
       unsigned ColumnLimit = getColumnLimit(TheLine.InPPDirective, NextLine);
       bool FitsIntoOneLine =
           TheLine.Last->TotalLength + Indent <= ColumnLimit ||
@@ -1136,6 +1188,7 @@ unsigned UnwrappedLineFormatter::format(
         Penalty += OptimizingLineFormatter(Indenter, Whitespaces, Style, this)
                        .formatLine(TheLine, NextStartColumn + Indent,
                                    FirstLine ? FirstStartColumn : 0, DryRun);
+*/
       RangeMinLevel = std::min(RangeMinLevel, TheLine.Level);
     } else {
       // If no token in the current line is affected, we still need to format
@@ -1215,6 +1268,7 @@ void UnwrappedLineFormatter::formatFirstToken(
       !startsExternCBlock(*PreviousLine))
     Newlines = 1;
 
+  /* TALLY COMMENT OUT
   // Insert extra new line before access specifiers.
   if (PreviousLine && PreviousLine->Last->isOneOf(tok::semi, tok::r_brace) &&
       RootToken.isAccessSpecifier() && RootToken.NewlinesBefore == 1)
@@ -1224,6 +1278,70 @@ void UnwrappedLineFormatter::formatFirstToken(
   if (PreviousLine && PreviousLine->First->isAccessSpecifier() &&
       (!PreviousLine->InPPDirective || !RootToken.HasUnescapedNewline))
     Newlines = std::min(1u, Newlines);
+  */
+
+  // TALLY: Ensure an empty line before access specifiers (exactly one)
+  // Insert extra new line before access specifiers.
+  if (PreviousLine && PreviousLine->Last->isOneOf(tok::semi, tok::r_brace) &&
+      RootToken.isAccessSpecifier())
+      Newlines = 2;
+
+  // TALLY: Ensure an empty line after access specifiers (exactly one)
+  if (PreviousLine && PreviousLine->First->isAccessSpecifier() &&
+      (!PreviousLine->InPPDirective || !RootToken.HasUnescapedNewline))
+      Newlines = 2;
+
+  // TALLY: Ensure an empty line before and after a comment section (excluding trailing line comments)
+  bool commentThenNoncomment = PreviousLine && PreviousLine->First->is(tok::comment) && !PreviousLine->InPPDirective && !RootToken.is(tok::comment);
+  bool noncommentThenComment = PreviousLine && !PreviousLine->First->is(tok::comment) && !PreviousLine->InPPDirective && RootToken.is(tok::comment);
+  if (commentThenNoncomment || noncommentThenComment)
+      Newlines = 2;
+
+  // TALLY: Remove empty lines before "};" in class, struct, union or enum declarations
+  // This block needs to be after 'Ensure an empty line before and after a comment section'
+  FormatToken* LastToken = Line.Last;
+  if (LastToken && LastToken->is(tok::comment))
+      LastToken = LastToken->getPreviousNonComment();
+  if (PreviousLine && PreviousLine->First && RootToken.is(tok::r_brace) && LastToken && LastToken->is(tok::semi)) {
+      bool applies = false;
+      if (PreviousLine->First->IsClassScope && !RootToken.IsClassScope)
+          applies = true;
+      if (PreviousLine->First->IsStructScope && !RootToken.IsStructScope)
+          applies = true;
+      if (PreviousLine->First->IsUnionScope && !RootToken.IsUnionScope)
+          applies = true;
+      if (PreviousLine->First->IsEnumScope && !RootToken.IsEnumScope)
+          applies = true;
+      if (applies)
+          Newlines = 1;
+  }
+
+  // TALLY: Add extra new line at the beginning of an if-, do-, for-, while-blocks
+  if (PreviousLine &&
+      PreviousLine->First->isOneOf(tok::kw_if, tok::kw_do, tok::kw_for, tok::kw_while) &&
+      PreviousLine->Last->is(tok::l_brace) && RootToken.NewlinesBefore == 1)
+      ++Newlines;
+
+  // TALLY: Add extra new line at the beginning of an else-block or else-if block
+  bool isElseBlock = false;
+  if (PreviousLine && PreviousLine->Last->is(tok::l_brace)) {
+      if (PreviousLine->First->is(tok::kw_else)) {
+          isElseBlock = true;
+      }
+      else if (PreviousLine->First->is(tok::r_brace)) {
+          const FormatToken* MyNext = PreviousLine->First->getNextNonComment();
+          if (MyNext->is(tok::kw_else)) {
+              isElseBlock = true;
+          }
+      }
+  }
+  if (isElseBlock && RootToken.NewlinesBefore == 1)
+      ++Newlines;
+
+  // TALLY: Add extra new line at the end of a double-indented block
+  if (PreviousLine && PreviousLine->IsDoubleIndented && !Line.IsDoubleIndented &&
+      RootToken.isNot(tok::comment) && RootToken.NewlinesBefore == 1)
+      ++Newlines;
 
   if (Newlines)
     Indent = NewlineIndent;
@@ -1261,7 +1379,8 @@ UnwrappedLineFormatter::getColumnLimit(bool InPPDirective,
         // If there is an unescaped newline between this line and the next, the
         // next line starts a new preprocessor directive.
         !NextLine->First->HasUnescapedNewline));
-  return Style.ColumnLimit - (ContinuesPPDirective ? 2 : 0);
+  unsigned ColumnLimitInEffect = InPPDirective ? Style.ColumnLimitExtended : Style.ColumnLimit;
+  return ColumnLimitInEffect - (ContinuesPPDirective ? 2 : 0);
 }
 
 } // namespace format

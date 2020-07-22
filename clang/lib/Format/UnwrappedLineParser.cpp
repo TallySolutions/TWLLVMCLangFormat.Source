@@ -1858,6 +1858,19 @@ bool UnwrappedLineParser::parseBracedList(bool ContinueOnSemicolons,
       nextToken();
       break;
     case tok::comma:
+      // TALLY: Force enum members on new line each
+      if (IsEnum && FormatTok->Previous) {
+        if (!FormatTok->Previous->is(tok::numeric_constant)) {
+          // Simple case
+          FormatTok->Previous->MustBreakBefore = true;
+        }
+        else {
+          // Relatively complex case: Numeric constant before comma
+          if (FormatTok->Previous->Previous && FormatTok->Previous->Previous->is(tok::equal) && FormatTok->Previous->Previous->Previous) {
+            FormatTok->Previous->Previous->Previous->MustBreakBefore = true;
+          }
+        }
+      }
       nextToken();
       if (IsEnum && !Style.AllowShortEnumsOnASingleLine)
         addUnwrappedLine();
@@ -1985,6 +1998,10 @@ void UnwrappedLineParser::parseIfThenElse() {
     --Line->Level;
   }
   if (FormatTok->Tok.is(tok::kw_else)) {
+    // TALLY: Never have a blank line before an else block
+    if (FormatTok->NewlinesBefore > 1) {
+      FormatTok->NewlinesBefore = 1;
+    }
     nextToken();
     // handle [[likely]] / [[unlikely]]
     if (FormatTok->Tok.is(tok::l_square) && tryToParseSimpleAttribute())
@@ -2338,8 +2355,9 @@ bool UnwrappedLineParser::parseEnum() {
     addUnwrappedLine();
     Line->Level += 1;
   }
+  // TALLY: Specify that we're in enum body
   bool HasError = !parseBracedList(/*ContinueOnSemicolons=*/true,
-                                   /*IsEnum=*/true);
+                                   /*IsEnum=*/true, tok::r_brace);
   if (!Style.AllowShortEnumsOnASingleLine)
     Line->Level -= 1;
   if (HasError) {
