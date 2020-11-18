@@ -615,7 +615,8 @@ static unsigned AlignTokens(const FormatStyle& Style, F&& Matches,
     /* TALLY */ unsigned MaxNewlinesBeforeSectionBreak,
     /* TALLY */ bool NonMatchingLineBreaksSection,
     /* TALLY */ bool AllowBeyondColumnLimitForAlignment,
-    /* TALLY */ unsigned MaxLeadingSpacesForAlignment
+    /* TALLY */ unsigned MaxLeadingSpacesForAlignment,
+    /* TALLY */ bool ForceAlignToFourSpaces 
 ) {
     // TALLY
     unsigned ColumnLimitInEffect = AllowBeyondColumnLimitForAlignment ? Style.ColumnLimitExtended : Style.ColumnLimit;
@@ -682,7 +683,8 @@ static unsigned AlignTokens(const FormatStyle& Style, F&& Matches,
             // Call AlignTokens recursively, skipping over this scope block.
             unsigned StoppedAt =
                 AlignTokens(Style, Matches, Changes, IgnoreScope, IgnoreCommas, i,
-                    MaxNewlinesBeforeSectionBreak, NonMatchingLineBreaksSection, AllowBeyondColumnLimitForAlignment, MaxLeadingSpacesForAlignment);
+                    MaxNewlinesBeforeSectionBreak, NonMatchingLineBreaksSection, 
+                    AllowBeyondColumnLimitForAlignment, MaxLeadingSpacesForAlignment, ForceAlignToFourSpaces);
             i = StoppedAt - 1;
             continue;
         }
@@ -725,6 +727,15 @@ static unsigned AlignTokens(const FormatStyle& Style, F&& Matches,
 
         MinColumn = std::max(MinColumn, ChangeMinColumn);
         MaxColumn = std::min(MaxColumn, ChangeMaxColumn);
+
+        // TALLY: Force align to four spaces
+        if (ForceAlignToFourSpaces) {
+            if (MinColumn % 4 != 0) {
+                unsigned int pad = 4 - (MinColumn % 4);
+                MinColumn += pad;
+                MaxColumn += pad;
+            }
+        }
     }
 
     EndOfSequence = i;
@@ -746,7 +757,8 @@ void WhitespaceManager::alignConsecutiveAssignmentsOnScopedVarName() {
         },
         Changes, /*IgnoreScope=*/false, /*IgnoreCommas=*/false, /*StartAt=*/0,
             /*MaxNewlinesBeforeSectionBreak=*/2, /*NonMatchingLineBreaksSection=*/true,
-            /*AllowBeyondColumnLimitForAlignment=*/true, /*MaxLeadingSpacesForAlignment=*/UINT_MAX);
+            /*AllowBeyondColumnLimitForAlignment=*/true, /*MaxLeadingSpacesForAlignment=*/UINT_MAX, 
+            /*ForceAlignToFourSpaces*/false);
 }
 
 // TALLY: Align assignments on variable name (ACROSS SECTIONS)
@@ -766,7 +778,8 @@ void WhitespaceManager::alignConsecutiveAssignmentsOnVarNameAcrossSections() {
         },
         Changes, /*IgnoreScope=*/false, /*IgnoreCommas=*/false, /*StartAt=*/0,
             /*MaxNewlinesBeforeSectionBreak=*/2, /*NonMatchingLineBreaksSection=*/false,
-            /*AllowBeyondColumnLimitForAlignment=*/true, /*MaxLeadingSpacesForAlignment=*/UINT_MAX);
+            /*AllowBeyondColumnLimitForAlignment=*/true, /*MaxLeadingSpacesForAlignment=*/UINT_MAX,
+            /*ForceAlignToFourSpaces*/false);
 }
 
 // TALLY: Align assignments on variable name (WITHIN SECTION)
@@ -785,7 +798,8 @@ void WhitespaceManager::alignConsecutiveAssignmentsOnVarNameWithinSection() {
         },
         Changes, /*IgnoreScope=*/false, /*IgnoreCommas=*/false, /*StartAt=*/0,
             /*MaxNewlinesBeforeSectionBreak=*/2, /*NonMatchingLineBreaksSection=*/true,
-            /*AllowBeyondColumnLimitForAlignment=*/true, /*MaxLeadingSpacesForAlignment=*/UINT_MAX);
+            /*AllowBeyondColumnLimitForAlignment=*/true, /*MaxLeadingSpacesForAlignment=*/UINT_MAX,
+            /*ForceAlignToFourSpaces*/true);
 }
 
 // TALLY: Align on bit field colon in a variable declaration (ACROSS SECTIONS)
@@ -813,7 +827,8 @@ void WhitespaceManager::alignConsecutiveVarBitFields() {
         },
         Changes, /*IgnoreScope=*/false, /*IgnoreCommas=*/false, /*StartAt=*/0,
             /*MaxNewlinesBeforeSectionBreak=*/2, /*NonMatchingLineBreaksSection=*/false,
-            /*AllowBeyondColumnLimitForAlignment=*/true, /*MaxLeadingSpacesForAlignment=*/UINT_MAX);
+            /*AllowBeyondColumnLimitForAlignment=*/true, /*MaxLeadingSpacesForAlignment=*/UINT_MAX,
+            /*ForceAlignToFourSpaces*/false);
 }
 
 /// TALLY: Align consecutive assignments over all \c Changes (ACROSS SECTIONS)
@@ -840,7 +855,8 @@ void WhitespaceManager::alignConsecutiveAssignmentsOnEqualsAcrossSections() {
         },
         Changes, /*IgnoreScope=*/false, /*IgnoreCommas=*/false, /*StartAt=*/0,
             /*MaxNewlinesBeforeSectionBreak=*/2, /*NonMatchingLineBreaksSection=*/false,
-            /*AllowBeyondColumnLimitForAlignment=*/true, /*MaxLeadingSpacesForAlignment=*/16);
+            /*AllowBeyondColumnLimitForAlignment=*/true, /*MaxLeadingSpacesForAlignment=*/16,
+            /*ForceAlignToFourSpaces*/false);
 }
 
 /// TALLY: Align consecutive assignments over all \c Changes (WITHIN SECTION)
@@ -866,7 +882,8 @@ void WhitespaceManager::alignConsecutiveAssignmentsOnEqualsWithinSection() {
         },
         Changes, /*IgnoreScope=*/false, /*IgnoreCommas=*/false, /*StartAt=*/0,
             /*MaxNewlinesBeforeSectionBreak=*/1, /*NonMatchingLineBreaksSection=*/true,
-            /*AllowBeyondColumnLimitForAlignment=*/true, /*MaxLeadingSpacesForAlignment=*/12);
+            /*AllowBeyondColumnLimitForAlignment=*/true, /*MaxLeadingSpacesForAlignment=*/12,
+            /*ForceAlignToFourSpaces*/false);
 }
 
 /// TALLY: Columnarize specific tokens over all \c Changes.
