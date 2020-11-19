@@ -981,17 +981,24 @@ void WhitespaceManager::columnarizeDeclarationSpecifierTokens() {
             continue;
 
         const FormatToken* PrevTok = MyTok->getPreviousNonComment();
+        if (PrevTok && PrevTok->isAfterTemplateType())
+            PrevTok = NULL;
 
         // 'const' is also applicable after parens, so filter out such tokens
         if (MyTok->is(tok::kw_const) && PrevTok && PrevTok->is(tok::r_paren))
             continue;
+
+        // Filter out the template token since they lie in a seperate line itself.
+        if (MyTok->isAfterTemplateType())
+            continue;
+
 
         AnnotatedLine* MyLine = MyTok->MyLine;
 
         // As spaces before 'static' or 'virtual' has been set to zero, if static or virtual 
         // is not the first specifier in the list, then it will concatenate with the preceding
         // specifier.
-        if (MyTok->isDeclSpecStaticOrVirtual()) {
+        if ((MyTok->isDeclSpecStaticOrVirtual() && PrevTok == NULL) || (MyTok->isDeclSpecinlineOrFriendOrExtern() && MyTok->getNextNonComment()->isDeclSpecStaticOrVirtual())) {
             Changes[i].StartOfTokenColumn = 0;
             Changes[i].Spaces = 0;
             MyLine->LastSpecifierPadding = MyTok->is(tok::kw_static) ? 2 : 1; // len(static)=6, len(virtual)=7
@@ -1022,8 +1029,8 @@ void WhitespaceManager::columnarizeDeclarationSpecifierTokens() {
             }
             // len=6
             else if (MyTok->isOneOf(tok::kw_inline, tok::kw_friend, tok::kw_extern)) {
-                MyLine->LastSpecifierPadding = 2;
-                MyLine->LastSpecifierTabs += 2;
+                   MyLine->LastSpecifierPadding = 2;
+                   MyLine->LastSpecifierTabs += 2;
             }
             // len=7
             else if (MyTok->is(tok::kw_mutable)) {

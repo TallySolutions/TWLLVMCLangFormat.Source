@@ -505,6 +505,34 @@ struct FormatToken {
       return (isOneOf(tok::kw_static, tok::kw_virtual)) ? true : false;
   }
 
+  bool isDeclSpecinlineOrFriendOrExtern() const {
+      return (isOneOf(tok::kw_inline, tok::kw_friend, tok::kw_extern)) ? true : false;
+  }
+
+  bool isAfterTemplateType () const {
+      return  (this->is(tok::greater) &&
+          this->getPreviousNonComment() &&
+          this->getPreviousNonComment()->is(tok::identifier) &&
+          this->getPreviousNonComment()->getPreviousNonComment() &&
+          this->getPreviousNonComment()->getPreviousNonComment()->is(tok::kw_typename) &&
+          this->getPreviousNonComment()->getPreviousNonComment()->getPreviousNonComment() &&
+          this->getPreviousNonComment()->getPreviousNonComment()->getPreviousNonComment()->is(tok::less) &&
+          this->getPreviousNonComment()->getPreviousNonComment()->getPreviousNonComment()->getPreviousNonComment() &&
+          this->getPreviousNonComment()->getPreviousNonComment()->getPreviousNonComment()->getPreviousNonComment()->is(tok::kw_template));
+  }
+
+  bool isTemplateType () const {
+      return (this->is(tok::kw_template) &&
+          this->getNextNonComment() &&
+          this->getNextNonComment()->is(tok::less) &&
+          this->getNextNonComment()->getNextNonComment() &&
+          this->getNextNonComment()->getNextNonComment()->is(tok::kw_typename) &&
+          this->getNextNonComment()->getNextNonComment()->getNextNonComment() &&
+          this->getNextNonComment()->getNextNonComment()->getNextNonComment()->is(tok::identifier) &&
+          this->getNextNonComment()->getNextNonComment()->getNextNonComment()->getNextNonComment() &&
+          this->getNextNonComment()->getNextNonComment()->getNextNonComment()->getNextNonComment()->is(tok::greater));
+  }
+
   // TALLY: Helper function
   bool isDatatype() const {
       if (!isDeclarationSpecifier()) {

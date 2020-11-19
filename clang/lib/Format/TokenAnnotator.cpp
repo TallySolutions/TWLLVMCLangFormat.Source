@@ -2565,11 +2565,13 @@ void TokenAnnotator::walkLine2(AnnotatedLine& Line) {
     MyToken = Line.First;
     if (MyToken) {
         for (MyToken = Line.First; MyToken != nullptr; MyToken = MyToken->Next) {
-            if (MyToken->IsInterimBeforeName || MyToken->IsRhsToken || MyToken->isNotScoped() || MyToken->isParenScoped())
+            if (MyToken->IsInterimBeforeName || MyToken->IsRhsToken || MyToken->isNotScoped() || MyToken->isParenScoped() || 
+                // Basically a template type, then move to next token.
+                (MyToken->getPreviousNonComment() && MyToken->getPreviousNonComment()->is(tok::kw_typename))) 
                 continue;
 
             // Datatype
-            if (MyToken->isDatatypeInner()) {
+            if (MyToken->isDatatypeInner()) { 
                 if (DtToken == nullptr)
                     DtToken = MyToken;
 
