@@ -505,32 +505,47 @@ struct FormatToken {
       return (isOneOf(tok::kw_static, tok::kw_virtual)) ? true : false;
   }
 
-  bool isDeclSpecinlineOrFriendOrExtern() const {
-      return (isOneOf(tok::kw_inline, tok::kw_friend, tok::kw_extern)) ? true : false;
+  //TALLY: To check if the preceding set of tokens are Template type.
+  bool isDeclSpecInlineOrExtern() const {
+      return (isOneOf(tok::kw_inline, tok::kw_extern)) ? true : false;
   }
 
+  //TALLY: To check if the preceding set of tokens are Template type.
   bool isAfterTemplateType () const {
-      return  (this->is(tok::greater) &&
-          this->getPreviousNonComment() &&
-          this->getPreviousNonComment()->is(tok::identifier) &&
-          this->getPreviousNonComment()->getPreviousNonComment() &&
-          this->getPreviousNonComment()->getPreviousNonComment()->is(tok::kw_typename) &&
-          this->getPreviousNonComment()->getPreviousNonComment()->getPreviousNonComment() &&
-          this->getPreviousNonComment()->getPreviousNonComment()->getPreviousNonComment()->is(tok::less) &&
-          this->getPreviousNonComment()->getPreviousNonComment()->getPreviousNonComment()->getPreviousNonComment() &&
-          this->getPreviousNonComment()->getPreviousNonComment()->getPreviousNonComment()->getPreviousNonComment()->is(tok::kw_template));
+      if (this->is(tok::greater)) {
+          FormatToken* prev = this->getPreviousNonComment();
+          if (prev && prev->is(tok::identifier)) {
+              prev = prev->getPreviousNonComment();
+              if (prev && prev->is(tok::kw_typename)) {
+                  prev = prev->getPreviousNonComment();
+                  if (prev && prev->is(tok::less)) {
+                      prev = prev->getPreviousNonComment();
+                      return (prev && prev->is(tok::kw_template));
+                  }
+              }
+          }
+      }
+
+      return false;
   }
 
+  //TALLY: To check if the current set of subsequent tokens are Template type.
   bool isTemplateType () const {
-      return (this->is(tok::kw_template) &&
-          this->getNextNonComment() &&
-          this->getNextNonComment()->is(tok::less) &&
-          this->getNextNonComment()->getNextNonComment() &&
-          this->getNextNonComment()->getNextNonComment()->is(tok::kw_typename) &&
-          this->getNextNonComment()->getNextNonComment()->getNextNonComment() &&
-          this->getNextNonComment()->getNextNonComment()->getNextNonComment()->is(tok::identifier) &&
-          this->getNextNonComment()->getNextNonComment()->getNextNonComment()->getNextNonComment() &&
-          this->getNextNonComment()->getNextNonComment()->getNextNonComment()->getNextNonComment()->is(tok::greater));
+      if (this->is (tok::kw_template)) {
+          const FormatToken* next = this->getNextNonComment();
+          if (next && next->is(tok::less)) {
+              next = next->getNextNonComment();
+              if (next && next->is(tok::kw_typename)) {
+                  next = next->getNextNonComment();
+                  if (next && next->is(tok::identifier)) {
+                      next = next->getNextNonComment();
+                      return (next && next->is(tok::greater));
+                  }
+              }
+          }
+      }
+
+      return false;
   }
 
   // TALLY: Helper function

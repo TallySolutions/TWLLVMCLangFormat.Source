@@ -982,7 +982,7 @@ void WhitespaceManager::columnarizeDeclarationSpecifierTokens() {
 
         const FormatToken* PrevTok = MyTok->getPreviousNonComment();
         if (PrevTok && PrevTok->isAfterTemplateType())
-            PrevTok = NULL;
+            PrevTok = nullptr;
 
         // 'const' is also applicable after parens, so filter out such tokens
         if (MyTok->is(tok::kw_const) && PrevTok && PrevTok->is(tok::r_paren))
@@ -998,7 +998,7 @@ void WhitespaceManager::columnarizeDeclarationSpecifierTokens() {
         // As spaces before 'static' or 'virtual' has been set to zero, if static or virtual 
         // is not the first specifier in the list, then it will concatenate with the preceding
         // specifier.
-        if ((MyTok->isDeclSpecStaticOrVirtual() && PrevTok == NULL) || (MyTok->isDeclSpecinlineOrFriendOrExtern() && MyTok->getNextNonComment()->isDeclSpecStaticOrVirtual())) {
+        if ((MyTok->isDeclSpecStaticOrVirtual() && PrevTok == nullptr) || (MyTok->isDeclSpecInlineOrExtern() && MyTok->getNextNonComment()->isDeclSpecStaticOrVirtual())) {
             Changes[i].StartOfTokenColumn = 0;
             Changes[i].Spaces = 0;
             MyLine->LastSpecifierPadding = MyTok->is(tok::kw_static) ? 2 : 1; // len(static)=6, len(virtual)=7
