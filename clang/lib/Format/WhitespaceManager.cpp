@@ -108,6 +108,7 @@ const tooling::Replacements& WhitespaceManager::generateReplacements() {
     alignConsecutiveVarBitFields();                       // TALLY. We do NOT use alignConsecutiveBitFields().
     alignConsecutiveAssignmentsOnEqualsAcrossSections();  // TALLY
     alignConsecutiveAssignmentsOnEqualsWithinSection();   // TALLY
+    alignConsecutiveLBraceOfConstexpr();                          // TALLY
 
     alignChainedConditionals();
     alignTrailingComments();
@@ -754,6 +755,22 @@ void WhitespaceManager::alignConsecutiveAssignmentsOnScopedVarName() {
             return
                 C.Tok->isScopedVarNameInDecl() &&
                 C.Tok->HasSemiColonInLine;
+        },
+        Changes, /*IgnoreScope=*/false, /*IgnoreCommas=*/false, /*StartAt=*/0,
+            /*MaxNewlinesBeforeSectionBreak=*/2, /*NonMatchingLineBreaksSection=*/true,
+            /*AllowBeyondColumnLimitForAlignment=*/true, /*MaxLeadingSpacesForAlignment=*/UINT_MAX, 
+            /*ForceAlignToFourSpaces*/false);
+}
+
+// TALLY : Align the consecutive constexprs
+void WhitespaceManager::alignConsecutiveLBraceOfConstexpr() {
+    if (!Style.AlignConsecutiveAssignments)
+        return;
+
+    AlignTokens(Style,
+        [&](const Change& C) {
+            return C.Tok->isLBraceOfConstexprDecl() && 
+                   C.Tok->HasSemiColonInLine; // Ensure is terminated by a semi colon.
         },
         Changes, /*IgnoreScope=*/false, /*IgnoreCommas=*/false, /*StartAt=*/0,
             /*MaxNewlinesBeforeSectionBreak=*/2, /*NonMatchingLineBreaksSection=*/true,

@@ -205,6 +205,9 @@ private:
   /// Align consecutive bitfields over all \c Changes.
   void alignConsecutiveBitFields();
 
+  // Align consecutive constexprs.
+  void alignConsecutiveLBraceOfConstexpr();
+
   /// TALLY: Columnarize specific tokens over all \c Changes.
   void columnarizePPKeywords();
 

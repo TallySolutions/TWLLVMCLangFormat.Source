@@ -374,7 +374,7 @@ struct FormatToken {
   unsigned OriginalLineBreakWeight = 0;
 
   /// TALLY: The owning line
-  AnnotatedLine* MyLine = nullptr;
+  mutable AnnotatedLine* MyLine = nullptr;
 
   /// TALLY: If this token is a datatype
   bool IsDatatype = false;
@@ -917,6 +917,21 @@ struct FormatToken {
       return prevOk && nextOk;
   }
 
+  //TALLY: Helper function to check if the lbrace is part of a constexpr
+  bool isLBraceOfConstexprDecl() const  {
+      if (is(tok::l_brace)) {
+          FormatToken * prev = getPreviousNonComment();
+
+          while (prev) {
+              if (prev->is(tok::kw_constexpr))
+                  return true;
+
+              prev = prev->getPreviousNonComment();
+          }
+      }
+      return false;
+  }
+  
   /// TALLY: Helper function
   bool isParenScoped() const {
       return (LparenCount - RparenCount == 1);
