@@ -998,7 +998,7 @@ void WhitespaceManager::columnarizeDeclarationSpecifierTokens() {
             continue;
 
         const FormatToken* PrevTok = MyTok->getPreviousNonComment();
-        if (PrevTok && PrevTok->isAfterTemplateType())
+        if (PrevTok && PrevTok->isAfterNoDiscardOrTemplateType())
             PrevTok = nullptr;
 
         // 'const' is also applicable after parens, so filter out such tokens
@@ -1006,7 +1006,7 @@ void WhitespaceManager::columnarizeDeclarationSpecifierTokens() {
             continue;
 
         // Filter out the template token since they lie in a seperate line itself.
-        if (MyTok->isAfterTemplateType())
+        if (MyTok->isAfterNoDiscardOrTemplateType())
             continue;
 
 

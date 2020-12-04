@@ -511,7 +511,7 @@ struct FormatToken {
   }
 
   //TALLY: To check if the preceding set of tokens are Template type.
-  bool isAfterTemplateType () const {
+  bool isAfterNoDiscardOrTemplateType () const {
       if (this->is(tok::greater)) {
           FormatToken* prev = this->getPreviousNonComment();
           if (prev && prev->is(tok::identifier)) {
@@ -521,6 +521,21 @@ struct FormatToken {
                   if (prev && prev->is(tok::less)) {
                       prev = prev->getPreviousNonComment();
                       return (prev && prev->is(tok::kw_template));
+                  }
+              }
+          }
+      }
+
+      if (this->is(tok::r_square)) {
+          FormatToken* prev = this->getPreviousNonComment();
+          if (prev && prev->is(tok::r_square)) {
+              prev = prev->getPreviousNonComment();
+              if (prev) {
+                  prev->TokenText.startswith("nodiscard");
+                  prev = prev->getPreviousNonComment();
+                  if (prev && prev->is(tok::l_square)) {
+                      prev = prev->getPreviousNonComment();
+                      return prev && prev->is(tok::l_square);
                   }
               }
           }
