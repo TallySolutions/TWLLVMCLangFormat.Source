@@ -95,10 +95,11 @@ const tooling::Replacements& WhitespaceManager::generateReplacements() {
     llvm::sort(Changes, Change::IsBeforeInFile(SourceMgr));
     calculateLineBreakInformation();
 
-    columnarizePPKeywords();                              // TALLY
-    columnarizePPDefineKeyword();                         // TALLY. We do NOT use alignConsecutiveMacros().
+    //columnarizePPKeywords();                              // TALLY
+    //columnarizePPDefineKeyword();                         // TALLY. We do NOT use alignConsecutiveMacros().
     columnarizeDeclarationSpecifierTokens();              // TALLY
     columnarizeDatatypeTokens();                          // TALLY
+    columnarizeNoDiscardOrNoReturnOrTemplate ();          // TALLY
     columnarizeIdentifierTokens();                        // TALLY
     columnarizeLParenTokens();                            // TALLY
 
@@ -998,7 +999,7 @@ void WhitespaceManager::columnarizeDeclarationSpecifierTokens() {
             continue;
 
         const FormatToken* PrevTok = MyTok->getPreviousNonComment();
-        if (PrevTok && PrevTok->isAfterNoDiscardOrTemplateType())
+        if (PrevTok && PrevTok->isAfterNoDiscardOrNoReturnOrTemplate())
             PrevTok = nullptr;
 
         // 'const' is also applicable after parens, so filter out such tokens
@@ -1006,9 +1007,8 @@ void WhitespaceManager::columnarizeDeclarationSpecifierTokens() {
             continue;
 
         // Filter out the template token since they lie in a seperate line itself.
-        if (MyTok->isAfterNoDiscardOrTemplateType())
+        if (MyTok->isAfterNoDiscardOrNoReturnOrTemplate())
             continue;
-
 
         AnnotatedLine* MyLine = MyTok->MyLine;
 
@@ -1096,66 +1096,214 @@ void WhitespaceManager::columnarizeDeclarationSpecifierTokens() {
 
 /// TALLY: Columnarize specific tokens over all \c Changes.
 // TODO: Works only if declaration specifiers and datatypes do not have inline comments between the tokens.
+
 void WhitespaceManager::columnarizeDatatypeTokens() {
-    if (!Style.AlignConsecutiveDeclarations)
-        return;
+  if (!Style.AlignConsecutiveDeclarations)
+    return;
 
-    if (MaxSpecifierTabs < 4)
-        MaxSpecifierTabs = 4;
+  if (MaxSpecifierTabs < 4)
+    MaxSpecifierTabs = 4;
 
-    for (int i = 0; i < Changes.size(); ++i) {
+  bool intemplate = false;;
 
-        const FormatToken* MyTok = Changes[i].Tok;
+  for (int i = 0; i < Changes.size(); ++i) {
 
-        if ((!(MyTok->IsClassScope || MyTok->IsStructScope)) || MyTok->LbraceCount == 0 || MyTok->LparenCount > 0)
-            continue;
+    const FormatToken *MyTok = Changes[i].Tok;
 
-        if (MyTok->IsDatatype) {
-            AnnotatedLine* MyLine = MyTok->MyLine;
+    if ((!(MyTok->IsClassScope || MyTok->IsStructScope)) || MyTok->LbraceCount == 0 || MyTok->LparenCount > 0)
+      continue;
 
-            bool functionNameAfterInterims = MyTok->isFunctionNameAfterInterims();
-            bool memVarNameAfterInterims = MyTok->isMemberVariableNameAfterInterims();
+    if (MyTok->is(tok::less) && MyTok->Previous->is(tok::kw_template))
+      intemplate = true;
 
-            if (functionNameAfterInterims || memVarNameAfterInterims) {
+    if (intemplate) {
 
-                size_t tokSize = ((StringRef)MyTok->TokenText).size();
+      if (MyTok->is(tok::greater))
+        intemplate = false;
 
-                FormatToken* NextTok = MyTok->getNextNonCommentNonConst();
-
-                size_t interimSize = 0;
-                while (NextTok && NextTok->IsInterimBeforeName) {
-                    interimSize += NextTok->SpacesRequiredBefore;
-                    interimSize += ((StringRef)NextTok->TokenText).size();
-                    NextTok = NextTok->getNextNonCommentNonConst();
-                }
-                tokSize += interimSize;
-
-                if (NextTok) {
-                    if ((functionNameAfterInterims && NextTok->isFunctionAndNextLeftParen()) ||
-                        (memVarNameAfterInterims && NextTok->isMemberVarNameInDecl()))
-                    {
-                        NextTok->PrevTokenSizeForColumnarization = tokSize;
-                    }
-                }
-
-                MaxDatatypeLen = MaxDatatypeLen < tokSize ? tokSize : MaxDatatypeLen;
-
-                if (MyLine->LastSpecifierTabs == 0) {
-                    Changes[i].Spaces = MaxSpecifierTabs * Style.TabWidth;
-                    MyLine->LastSpecifierTabs = MaxSpecifierTabs;
-                }
-                else if (MyLine->LastSpecifierTabs < MaxSpecifierTabs) {
-                    Changes[i].Spaces = ((MaxSpecifierTabs - MyLine->LastSpecifierTabs) * Style.TabWidth) + MyLine->LastSpecifierPadding;
-                    MyLine->LastSpecifierTabs = MaxSpecifierTabs;
-                }
-                else if (MyLine->LastSpecifierTabs == MaxSpecifierTabs) {
-                    Changes[i].Spaces = MyLine->LastSpecifierPadding;
-                }
-
-                Changes[i].StartOfTokenColumn = MaxSpecifierTabs * Style.TabWidth;
-            }
-        }
+      continue;
     }
+
+    if (MyTok->IsDatatype) {
+
+        AnnotatedLine *MyLine = MyTok->MyLine;
+
+        bool functionNameAfterInterims = MyTok->isFunctionNameAfterInterims();
+        bool memVarNameAfterInterims = MyTok->isMemberVariableNameAfterInterims();
+
+      if (functionNameAfterInterims || memVarNameAfterInterims) {
+
+          size_t tokSize = ((StringRef)MyTok->TokenText).size();
+
+          FormatToken *NextTok = MyTok->getNextNonCommentNonConst();
+
+          size_t interimSize = 0;
+
+        while (NextTok && NextTok->IsInterimBeforeName) {
+
+          interimSize += NextTok->SpacesRequiredBefore;
+          interimSize += ((StringRef)NextTok->TokenText).size();
+          NextTok = NextTok->getNextNonCommentNonConst();
+        }
+        tokSize += interimSize;
+
+        if (NextTok) {
+
+          if ((functionNameAfterInterims && NextTok->isFunctionAndNextLeftParen()) ||
+              (memVarNameAfterInterims && NextTok->isMemberVarNameInDecl())) {
+
+            NextTok->PrevTokenSizeForColumnarization = tokSize;
+          }
+        }
+
+        MaxDatatypeLen = MaxDatatypeLen < tokSize ? tokSize : MaxDatatypeLen;
+
+        if (MyLine->LastSpecifierTabs == 0) {
+
+          Changes[i].Spaces = MaxSpecifierTabs * Style.TabWidth;
+          MyLine->LastSpecifierTabs = MaxSpecifierTabs;
+        }
+        else if (MyLine->LastSpecifierTabs < MaxSpecifierTabs) {
+
+          Changes[i].Spaces = ((MaxSpecifierTabs - MyLine->LastSpecifierTabs) * Style.TabWidth) + MyLine->LastSpecifierPadding;
+          MyLine->LastSpecifierTabs = MaxSpecifierTabs;
+        }
+        else if (MyLine->LastSpecifierTabs == MaxSpecifierTabs) {
+
+          Changes[i].Spaces = MyLine->LastSpecifierPadding;
+        }
+
+        Changes[i].StartOfTokenColumn = MaxSpecifierTabs * Style.TabWidth;
+      }
+    }
+  }
+}
+
+void WhitespaceManager::columnarizeNoDiscardOrNoReturnOrTemplate() {
+    int spacecount;
+
+  if (!Style.AlignConsecutiveDeclarations)
+    return;
+
+  if (MaxSpecifierTabs < 4)
+    MaxSpecifierTabs = 4;
+
+  for (int i = 0; i < Changes.size(); ++i) {
+
+    const FormatToken *MyTok = Changes[i].Tok;
+
+    if ((!(MyTok->IsClassScope || MyTok->IsStructScope)) || MyTok->LbraceCount == 0 || MyTok->LparenCount > 0)
+      continue;
+
+    if (MyTok->isNoDiscardOrNoReturnOrTemplate()) {
+
+      if (MyTok->is(tok::l_square)) {
+
+        Changes[i].StartOfTokenColumn = MaxSpecifierTabs * Style.TabWidth;
+        Changes[i].Spaces = MaxSpecifierTabs * Style.TabWidth;
+
+          const FormatToken *next = MyTok->getNextNonComment();
+
+        if (next && next->is(tok::l_square)) {
+
+          ++i;
+          Changes[i].StartOfTokenColumn = MaxSpecifierTabs * Style.TabWidth;
+          Changes[i].Spaces = 0;
+
+          next = next->getNextNonComment();
+          if (next && (next->TokenText.startswith("nodiscard") || next->TokenText.startswith("noreturn"))) {
+
+            ++i;
+            Changes[i].StartOfTokenColumn += MaxSpecifierTabs * Style.TabWidth;
+            Changes[i].Spaces = 0;
+
+            next = next->getNextNonComment();
+            if (next && next->is(tok::r_square)) {
+
+              ++i;
+              Changes[i].StartOfTokenColumn += MaxSpecifierTabs * Style.TabWidth;
+              Changes[i].Spaces = 0;
+
+              next = next->getNextNonComment();
+              if (next && next->is(tok::r_square)) {
+
+                ++i;
+                Changes[i].StartOfTokenColumn += MaxSpecifierTabs * Style.TabWidth;
+                Changes[i].Spaces = 0;
+              }
+            }
+          }
+        }
+      }
+
+      if (MyTok->is(tok::kw_template)) {
+
+        spacecount = 0;
+
+        Changes[i].StartOfTokenColumn = MaxSpecifierTabs * Style.TabWidth;
+        Changes[i].Spaces = MaxSpecifierTabs * Style.TabWidth;
+
+          const FormatToken *next = MyTok->getNextNonComment();
+
+        if (next && next->is(tok::less)) {
+
+          ++i;
+
+          Changes[i].StartOfTokenColumn += MaxSpecifierTabs * Style.TabWidth;
+          Changes[i].Spaces = 1;
+
+          next = next->getNextNonComment();
+          while (next && (next->is(tok::kw_typename) || next->isDatatype())) {
+
+            ++i;
+
+            Changes[i].StartOfTokenColumn += MaxSpecifierTabs * Style.TabWidth;
+            Changes[i].Spaces = spacecount;
+
+            next = next->getNextNonComment();
+
+            if (next && next->is(tok::ellipsis)) {
+
+              ++i;
+
+              Changes[i].StartOfTokenColumn += MaxSpecifierTabs * Style.TabWidth;
+              Changes[i].Spaces = 0;
+
+              next = next->getNextNonComment();
+            }
+
+            if (next && next->is(tok::identifier)) {
+
+              ++i;
+
+              Changes[i].StartOfTokenColumn += MaxSpecifierTabs * Style.TabWidth;
+              Changes[i].Spaces = 1;
+
+              next = next->getNextNonComment();
+              if (next && next->is(tok::greater)) {
+
+                ++i;
+
+                Changes[i].StartOfTokenColumn += MaxSpecifierTabs * Style.TabWidth;
+                Changes[i].Spaces = 0;
+              }
+              else if (next && next->is(tok::comma)) {
+
+                ++i;
+
+                Changes[i].StartOfTokenColumn += MaxSpecifierTabs * Style.TabWidth;
+                Changes[i].Spaces = 0;
+
+                next = next->getNextNonComment();
+              }
+
+              spacecount = 1;
+            }
+          }
+        }
+      }
+    }
+  }
 }
 
 /// TALLY: Columnarize specific tokens over all \c Changes.

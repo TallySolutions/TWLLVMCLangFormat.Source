@@ -2562,13 +2562,25 @@ void TokenAnnotator::walkLine2(AnnotatedLine& Line) {
 
     // Second loop for 'IsVariableNameWithDatatype', 'IsFunctionName', and 'IsDatatype'
     FormatToken* DtToken = nullptr;
+    bool intemplate = false;
     MyToken = Line.First;
     if (MyToken) {
         for (MyToken = Line.First; MyToken != nullptr; MyToken = MyToken->Next) {
             if (MyToken->IsInterimBeforeName || MyToken->IsRhsToken || MyToken->isNotScoped() || MyToken->isParenScoped() || 
                 // Basically a template type, then move to next token.
-                (MyToken->getPreviousNonComment() && MyToken->getPreviousNonComment()->is(tok::kw_typename))) 
+                (MyToken->getPreviousNonComment() && (MyToken->getPreviousNonComment()->is(tok::kw_typename) || MyToken->getPreviousNonComment()->is(tok::ellipsis))))
                 continue;
+
+            if (MyToken->is(tok::less) && MyToken->Previous->is(tok::kw_template))
+                intemplate = true;
+
+            if (intemplate) {
+
+              if (MyToken->is(tok::greater))
+                intemplate = false;
+
+              continue;
+            }
 
             // Datatype
             if (MyToken->isDatatypeInner()) { 

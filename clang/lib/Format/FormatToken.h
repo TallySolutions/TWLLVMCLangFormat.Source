@@ -485,7 +485,8 @@ struct FormatToken {
           !(TokenText.startswith("CALLOC") ||
               TokenText.startswith("MALLOC") ||
               TokenText.startswith("WINAPI") ||
-              TokenText.startswith("nodiscard"));
+              TokenText.startswith("nodiscard") || 
+              TokenText.startswith("noreturn"));
   }
 
   // TALLY: Helper function
@@ -511,18 +512,22 @@ struct FormatToken {
   }
 
   //TALLY: To check if the preceding set of tokens are Template type.
-  bool isAfterNoDiscardOrTemplateType () const {
+  bool isAfterNoDiscardOrNoReturnOrTemplate () const {
       if (this->is(tok::greater)) {
           FormatToken* prev = this->getPreviousNonComment();
-          if (prev && prev->is(tok::identifier)) {
-              prev = prev->getPreviousNonComment();
-              if (prev && prev->is(tok::kw_typename)) {
-                  prev = prev->getPreviousNonComment();
-                  if (prev && prev->is(tok::less)) {
-                      prev = prev->getPreviousNonComment();
-                      return (prev && prev->is(tok::kw_template));
-                  }
-              }
+          while (prev && prev->is(tok::identifier)) {
+            prev = prev->getPreviousNonComment();
+            if (prev && prev->is(tok::ellipsis))
+                prev = prev->getPreviousNonComment();
+
+            if (prev && (prev->is(tok::kw_typename) || prev->isDatatype())) {
+                prev = prev->getPreviousNonComment();
+                if (prev && prev->is(tok::less)) {
+                    prev = prev->getPreviousNonComment();
+                    return (prev && prev->is(tok::kw_template));
+                } else if (prev && prev->is(tok::comma))
+                    prev = prev->getPreviousNonComment();
+            }
           }
       }
 
@@ -531,7 +536,6 @@ struct FormatToken {
           if (prev && prev->is(tok::r_square)) {
               prev = prev->getPreviousNonComment();
               if (prev) {
-                  prev->TokenText.startswith("nodiscard");
                   prev = prev->getPreviousNonComment();
                   if (prev && prev->is(tok::l_square)) {
                       prev = prev->getPreviousNonComment();
@@ -545,22 +549,54 @@ struct FormatToken {
   }
 
   //TALLY: To check if the current set of subsequent tokens are Template type.
-  bool isTemplateType () const {
-      if (this->is (tok::kw_template)) {
-          const FormatToken* next = this->getNextNonComment();
-          if (next && next->is(tok::less)) {
-              next = next->getNextNonComment();
-              if (next && next->is(tok::kw_typename)) {
-                  next = next->getNextNonComment();
-                  if (next && next->is(tok::identifier)) {
-                      next = next->getNextNonComment();
-                      return (next && next->is(tok::greater));
-                  }
-              }
-          }
-      }
+  bool isNoDiscardOrNoReturnOrTemplate() const {
+    if (this->is(tok::kw_template)) {
 
-      return false;
+      const FormatToken *next = this->getNextNonComment();
+      if (next && next->is(tok::less)) {
+
+        next = next->getNextNonComment();
+        while (next && (next->is(tok::kw_typename) || next->isDatatype())) {
+
+          next = next->getNextNonComment();
+
+          if (next && next->is(tok::ellipsis))
+            next = next->getNextNonComment();
+
+          if (next && next->is(tok::identifier)) {
+
+            next = next->getNextNonComment();
+            if (next && next->is(tok::greater))
+              return true;
+            else if (next && next->is(tok::comma))
+              next = next->getNextNonComment();
+            else
+              break;
+          }
+        }
+      }
+    }
+
+    if (this->is(tok::l_square)) {
+
+      const FormatToken *next = this->getNextNonComment();
+
+      if (next && next->is(tok::l_square)) {
+
+        next = next->getNextNonComment();
+        if (next && (next->TokenText.startswith ("nodiscard") || next->TokenText.startswith ("noreturn"))) {
+
+          next = next->getNextNonComment();
+          if (next && next->is(tok::r_square)) {
+
+            next = next->getNextNonComment();
+            return next && next->is(tok::r_square);
+          }
+        }
+      }
+    }
+
+    return false;
   }
 
   // TALLY: Helper function

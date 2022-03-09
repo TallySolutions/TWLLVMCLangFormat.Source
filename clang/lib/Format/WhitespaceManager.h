@@ -220,6 +220,9 @@ private:
   /// TALLY: Columnarize specific tokens over all \c Changes.
   void columnarizeDatatypeTokens();
 
+  /// TALLY: Columnarize NoDiscard NoReturn, and template.
+  void columnarizeNoDiscardOrNoReturnOrTemplate();
+
   /// TALLY: Columnarize specific tokens over all \c Changes.
   void columnarizeIdentifierTokens();
 
