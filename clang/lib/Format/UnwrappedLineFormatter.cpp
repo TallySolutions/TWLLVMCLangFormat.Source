@@ -1123,6 +1123,19 @@ unsigned UnwrappedLineFormatter::format(
   for (const AnnotatedLine *Line =
            Joiner.getNextMergedLine(DryRun, IndentTracker);
        Line; Line = NextLine, FirstLine = false) {
+
+    /// TALLY : Ignore the lines that we dont want to format. Currently variables declared as maybe_unused or template based friend class.
+    ///          Line containing string literal. Hence for these, we do not need to employ clang-format off 
+    if (Line && 
+        (Line->First->isMaybeUnused() || 
+         Line->First->isTemplatizedFriendSpecifier() ||
+         (Line->startsWith (tok::hash) || Line->InPPDirective) ||
+         Line->startsWith (tok::kw_using) ||
+         (Line->startsWith(tok::kw_constexpr) || Line->startsWith(tok::kw_static, tok::kw_constexpr)) ||
+         Line->hasStringLiteral ())) {
+        markFinalized (Line->First);
+    }
+
     const AnnotatedLine &TheLine = *Line;
     unsigned Indent = IndentTracker.getIndent();
 
@@ -1285,6 +1298,10 @@ void UnwrappedLineFormatter::formatFirstToken(
   if (PreviousLine && PreviousLine->Last->isOneOf(tok::semi, tok::r_brace) &&
       RootToken.isAccessSpecifier())
       Newlines = 2;
+
+  // TALLY: Add a new line after TallyTrace.
+  if (PreviousLine && PreviousLine->First->isTallyTrace())
+    Newlines = 2;
 
   // TALLY: Ensure an empty line after access specifiers (exactly one)
   if (PreviousLine && PreviousLine->First->isAccessSpecifier() &&

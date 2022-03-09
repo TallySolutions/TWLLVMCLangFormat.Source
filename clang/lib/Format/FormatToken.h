@@ -11,7 +11,7 @@
 /// around Token with additional information related to formatting.
 ///
 //===----------------------------------------------------------------------===//
-
+// clang-format off
 #ifndef LLVM_CLANG_LIB_FORMAT_FORMATTOKEN_H
 #define LLVM_CLANG_LIB_FORMAT_FORMATTOKEN_H
 
@@ -352,6 +352,12 @@ struct FormatToken {
   /// TALLY: If this token is part of a enum scope
   bool IsEnumScope = false;
 
+  /// TALLY: If part of function definition line.
+  bool IsFunctionDefinitionLine = false;
+
+  /// TALLY: If in function definition scope.
+  bool IsInFunctionDefinitionScope = false;
+
   /// TALLY: Name of the struct (if any) this token is scoped under
   StringRef StructScopeName = "<StructScopeName_None>";
 
@@ -511,70 +517,71 @@ struct FormatToken {
       return (isOneOf(tok::kw_inline, tok::kw_extern)) ? true : false;
   }
 
-  //TALLY: To check if the preceding set of tokens are Template type.
-  bool isAfterNoDiscardOrNoReturnOrTemplate () const {
-      if (this->is(tok::greater)) {
-          FormatToken* prev = this->getPreviousNonComment();
-          while (prev && prev->is(tok::identifier)) {
-            prev = prev->getPreviousNonComment();
-            if (prev && prev->is(tok::ellipsis))
-                prev = prev->getPreviousNonComment();
+  //TALLY: to check if the block is a template specifier or not.
+  const FormatToken * walkTemplateBlockInClassDecl() const {
+    int bracecount = 0;
+    const FormatToken *next = this->getNextNonComment();
 
-            if (prev && (prev->is(tok::kw_typename) || prev->isDatatype())) {
-                prev = prev->getPreviousNonComment();
-                if (prev && prev->is(tok::less)) {
-                    prev = prev->getPreviousNonComment();
-                    return (prev && prev->is(tok::kw_template));
-                } else if (prev && prev->is(tok::comma))
-                    prev = prev->getPreviousNonComment();
+    if (this->is(tok::kw_template) && next && next->is(tok::less)) {
+        do {
+          if (next && next->is(tok::less))
+              ++bracecount;
+
+          if (next && next->is(tok::greater))
+              --bracecount;
+
+          next = next->getNextNonComment();
+        } while (bracecount && next);
+
+        if (bracecount == 0)
+            return next;
+    }
+
+    return nullptr;
+  }
+
+  //TALLY: To check if the preceding set of tokens are Template type.
+  bool isAfterNoDiscardOrNoReturnOrTemplate (unsigned & newlineCount) const;
+
+  //TALLY: To check if the friend declaration is for a templatized type..
+  bool isTemplatizedFriendSpecifier() const {
+    const FormatToken * next = walkTemplateBlockInClassDecl ();
+
+    return (next && next->is(tok::kw_friend));
+  }
+
+  //TALLY : To check if the current block start from 'this' is maybe_unused.
+  bool isMaybeUnused() const {
+    if (this->is(tok::l_square)) {
+
+      const FormatToken *next = this->getNextNonComment();
+
+      if (next && next->is(tok::l_square)) {
+
+        next = next->getNextNonComment();
+        if (next && (next->TokenText.startswith ("maybe_unused"))) {
+
+          next = next->getNextNonComment();
+          if (next && next->is(tok::r_square)) {
+
+            next = next->getNextNonComment();
+
+            if (next && next->is(tok::r_square)) {
+                return true;
             }
           }
+        }
       }
+    }
 
-      if (this->is(tok::r_square)) {
-          FormatToken* prev = this->getPreviousNonComment();
-          if (prev && prev->is(tok::r_square)) {
-              prev = prev->getPreviousNonComment();
-              if (prev) {
-                  prev = prev->getPreviousNonComment();
-                  if (prev && prev->is(tok::l_square)) {
-                      prev = prev->getPreviousNonComment();
-                      return prev && prev->is(tok::l_square);
-                  }
-              }
-          }
-      }
-
-      return false;
+    return false;
   }
 
   //TALLY: To check if the current set of subsequent tokens are Template type.
   bool isNoDiscardOrNoReturnOrTemplate() const {
-    if (this->is(tok::kw_template)) {
+    if (walkTemplateBlockInClassDecl () != nullptr) {
 
-      const FormatToken *next = this->getNextNonComment();
-      if (next && next->is(tok::less)) {
-
-        next = next->getNextNonComment();
-        while (next && (next->is(tok::kw_typename) || next->isDatatype())) {
-
-          next = next->getNextNonComment();
-
-          if (next && next->is(tok::ellipsis))
-            next = next->getNextNonComment();
-
-          if (next && next->is(tok::identifier)) {
-
-            next = next->getNextNonComment();
-            if (next && next->is(tok::greater))
-              return true;
-            else if (next && next->is(tok::comma))
-              next = next->getNextNonComment();
-            else
-              break;
-          }
-        }
-      }
+      return true;
     }
 
     if (this->is(tok::l_square)) {
@@ -633,22 +640,20 @@ struct FormatToken {
   // TALLY: Helper function
   bool isConstructor() const {
       const FormatToken* MyPrev = getPreviousNonComment();
-      const FormatToken* MyNext = getNextNonComment();
       if (MyPrev && MyPrev->is(tok::tilde)) {
           return false;
       }
-      bool rc = isClassOrStructNamed() && LbraceCount > 0 && MyNext && MyNext->is(tok::l_paren);
-      return rc;
+
+      return (ClassScopeName.equals (TokenText));
   }
 
   // TALLY: Helper function
   bool isDestructor() const {
       const FormatToken* MyNext = getNextNonComment();
       if (is(tok::tilde) && MyNext) {
-          const FormatToken* MyNextNext = MyNext->getNextNonComment();
-          bool rc = MyNext->isClassOrStructNamed() && MyNext->LbraceCount > 0 && MyNextNext && MyNextNext->is(tok::l_paren);
-          return rc;
+          return (MyNext->ClassScopeName.equals (MyNext->TokenText));
       }
+
       return false;
   }
 

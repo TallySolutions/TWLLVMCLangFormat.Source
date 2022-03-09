@@ -11,7 +11,7 @@
 /// \c AnnotatedTokens out of \c FormatTokens with required extra information.
 ///
 //===----------------------------------------------------------------------===//
-
+// clang-format off
 #ifndef LLVM_CLANG_LIB_FORMAT_TOKENANNOTATOR_H
 #define LLVM_CLANG_LIB_FORMAT_TOKENANNOTATOR_H
 
@@ -119,6 +119,16 @@ public:
            startsWith(tok::kw_export, tok::kw_namespace);
   }
 
+  /// TALLY : To state if there is a string literal in the line expression.
+  bool hasStringLiteral() const {
+      for (const FormatToken* curr = First; curr; curr = curr->getNextNonComment()) {
+        if (curr->isStringLiteral())
+          return true;
+      }
+
+      return false;
+  }
+
   FormatToken *First;
   FormatToken *Last;
 
@@ -190,6 +200,12 @@ public:
 
   /// TALLY: If a given token is part of a enum scope
   bool IsEnumScope = false;
+
+  /// TALLY: If in function definition.
+  bool IsInFunctionDefinition = false;
+
+  /// TALLY : If in function definition Line. and not body.
+  bool IsFunctionDefinitionLine = false;
 
   /// TALLY: Name of the struct (if any) a given token is scoped under
   StringRef StructScopeName = "<StructScopeName_None>";

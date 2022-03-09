@@ -11,7 +11,7 @@
 /// \c AnnotatedTokens out of \c FormatTokens with required extra information.
 ///
 //===----------------------------------------------------------------------===//
-
+// clang-format off
 #include "TokenAnnotator.h"
 #include "FormatToken.h"
 #include "clang/Basic/SourceManager.h"
@@ -2424,8 +2424,9 @@ void TokenAnnotator::walkLine1(AnnotatedLine& Line) {
     if (MyToken) {
         for (MyToken = Line.First; MyToken != nullptr; MyToken = MyToken->Next) {
             // Compute state
+
             if (MyToken->isOneOf(tok::kw_class, tok::kw_struct, tok::kw_union, tok::kw_enum)) {
-                if (MyToken->is(tok::kw_class)) {
+                if (MyToken->is(tok::kw_class) && Line.First->is(tok::kw_class)) {
                     IsClassScope = true;
                     const FormatToken* Next = MyToken->getNextNonComment();
                     if (Next) {
@@ -2443,11 +2444,16 @@ void TokenAnnotator::walkLine1(AnnotatedLine& Line) {
                     IsUnionScope = true;
                 }
                 if (MyToken->is(tok::kw_enum)) {
+                    if (MyToken->Next->is(tok::kw_class))
+                        MyToken = MyToken->Next;
+
                     IsEnumScope = true;
                 }
             }
             else if (MyToken->is(tok::l_brace)) {
                 LbraceCount++;
+                if (LparenCount == RparenCount && IsInFunctionDefinition)
+                    IsFunctionDefinitionLine = false;
             }
             else if (MyToken->is(tok::r_brace)) {
                 RbraceCount++;
@@ -2469,8 +2475,16 @@ void TokenAnnotator::walkLine1(AnnotatedLine& Line) {
                     }
 
                     if (IsEnumScope) {
+                        MyToken->IsEnumScope = IsEnumScope;
+                        if(MyToken->Next && MyToken->Next->is(tok::semi))
+                            MyToken->Next->IsEnumScope = true;
                         IsEnumScope = false;
                     }
+
+                    if (IsFunctionDefinitionLine) {
+                        IsInFunctionDefinition = false;
+                    }
+
                 }
             }
             else if (MyToken->is(tok::l_paren)) {
@@ -2505,6 +2519,12 @@ void TokenAnnotator::walkLine1(AnnotatedLine& Line) {
             }
             else if (MyToken->is(tok::arrow)) {
                 OriginalLineBreakWeight += 2;
+            } 
+            else if (!Line.endsWith(tok::semi) && !Line.MightBeFunctionDecl && MyToken->isDatatype() &&
+                IsClassScope == false && IsStructScope == false && IsEnumScope == false &&
+                RbraceCount == LbraceCount && LbraceCount == 0) {
+                IsInFunctionDefinition = true;
+                IsFunctionDefinitionLine = true;
             }
 
             // Copy state
@@ -2514,13 +2534,15 @@ void TokenAnnotator::walkLine1(AnnotatedLine& Line) {
             MyToken->IsClassScope = IsClassScope;
             MyToken->IsStructScope = IsStructScope;
             MyToken->IsUnionScope = IsUnionScope;
-            MyToken->IsEnumScope = IsEnumScope;
+            MyToken->IsEnumScope = MyToken->IsEnumScope ? true : IsEnumScope;
             MyToken->StructScopeName = StructScopeName;
             MyToken->ClassScopeName = ClassScopeName;
             MyToken->LbraceCount = LbraceCount;
             MyToken->RbraceCount = RbraceCount;
             MyToken->LparenCount = LparenCount;
             MyToken->RparenCount = RparenCount;
+            MyToken->IsFunctionDefinitionLine = IsFunctionDefinitionLine;
+            MyToken->IsInFunctionDefinitionScope = IsInFunctionDefinition;
         }
     }
 
@@ -2562,28 +2584,30 @@ void TokenAnnotator::walkLine2(AnnotatedLine& Line) {
 
     // Second loop for 'IsVariableNameWithDatatype', 'IsFunctionName', and 'IsDatatype'
     FormatToken* DtToken = nullptr;
-    bool intemplate = false;
+    int bracecount = 0;
     MyToken = Line.First;
     if (MyToken) {
         for (MyToken = Line.First; MyToken != nullptr; MyToken = MyToken->Next) {
-            if (MyToken->IsInterimBeforeName || MyToken->IsRhsToken || MyToken->isNotScoped() || MyToken->isParenScoped() || 
+            if (MyToken->IsInterimBeforeName || MyToken->IsRhsToken || MyToken->isNotScoped() || MyToken->isParenScoped())
                 // Basically a template type, then move to next token.
-                (MyToken->getPreviousNonComment() && (MyToken->getPreviousNonComment()->is(tok::kw_typename) || MyToken->getPreviousNonComment()->is(tok::ellipsis))))
                 continue;
 
-            if (MyToken->is(tok::less) && MyToken->Previous->is(tok::kw_template))
-                intemplate = true;
+            if (MyToken->is(tok::less) && MyToken->Previous->is(tok::kw_template)) {
 
-            if (intemplate) {
+                ++bracecount;
+                continue;
+            }
+
+            if (bracecount) {
 
               if (MyToken->is(tok::greater))
-                intemplate = false;
-
+                --bracecount;
+              
               continue;
             }
 
             // Datatype
-            if (MyToken->isDatatypeInner()) { 
+            if (MyToken->isDatatypeInner()) {
                 if (DtToken == nullptr)
                     DtToken = MyToken;
 
@@ -2613,7 +2637,8 @@ void TokenAnnotator::walkLine2(AnnotatedLine& Line) {
                 const FormatToken* Next = MyToken->getNextNonComment();
 
                 // Function name
-                if (MyToken->isFunctionName() && Next && Next->is(tok::l_paren)) {
+                if ((MyToken->isFunctionName() && Next && Next->is(tok::l_paren) && MyToken->Previous->isDatatype() == false) || 
+                    (MyToken->isFunctionName() && Next && Next->is(tok::l_paren) && (MyToken->IsClassScope || MyToken->IsStructScope))) {
                     MyToken->IsFunctionName = true;
                     DtToken->IsDatatype = true;
                 }
@@ -2626,7 +2651,9 @@ void TokenAnnotator::walkLine2(AnnotatedLine& Line) {
                         }
                         else if (Next->is(tok::l_brace) && Next->MatchingParen) {
                             nextOk = true;
-                        }
+                        } 
+                        else if (Next->is(tok::l_paren) && Prev->is(tok::coloncolon) == false /*&& Next->IsClassScope == false*/)
+                          nextOk = true;
                         else if (Next->is(tok::colon)) {
                             const FormatToken* MyNext2 = Next->getNextNonComment();
                             if (MyNext2 && MyNext2->is(tok::numeric_constant)) {

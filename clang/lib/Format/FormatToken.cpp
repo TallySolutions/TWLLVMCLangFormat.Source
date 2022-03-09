@@ -11,8 +11,10 @@
 /// roles.
 ///
 //===----------------------------------------------------------------------===//
-
+// clang-format off
 #include "FormatToken.h"
+///TALLY : Need for one function.
+#include "TokenAnnotator.h"
 #include "ContinuationIndenter.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
@@ -66,6 +68,54 @@ bool FormatToken::isSimpleTypeSpecifier() const {
   default:
     return false;
   }
+}
+
+/// TALLY: To check if the preceding set of tokens are Template type. If need to optimize, then 
+///         can dumb this function with compromise of inserting a new line.
+bool FormatToken::isAfterNoDiscardOrNoReturnOrTemplate(unsigned & newlinescount) const {
+
+  const FormatToken * logicalfirst = nullptr;
+
+  /// If the line is of type [[...]] template <...> ...
+
+  if (this->is(tok::greater)) {
+
+    /// Basically skip the attribute part.
+    if (this->MyLine->First->is(tok::l_square)) {
+      logicalfirst = this->MyLine->First;
+     
+      while (logicalfirst) {
+          if (logicalfirst->is(tok::kw_template))
+              break;
+          logicalfirst = logicalfirst->getNextNonComment();
+      }
+    }
+    /// Else if the line is of type template <...> ...
+    else if (this->MyLine->First->is(tok::kw_template))
+      logicalfirst = this->MyLine->First;
+
+    if (logicalfirst) {
+      if (this->Next == logicalfirst->walkTemplateBlockInClassDecl ())
+        newlinescount = 1;
+
+      return logicalfirst->is(tok::kw_template);
+    }
+  }
+
+  /// Cant start from first since the line can be of type template <...> [[...]] ...
+  if ( this->is(tok::r_square) && 
+      (this->Previous && this->Previous->is (tok::r_square)) && 
+      ((this->Previous->Previous && this->Previous->Previous->TokenText.startswith ("nodiscard")) ||
+       (this->Previous->Previous && this->Previous->Previous->TokenText.startswith ("noreturn"))) && 
+      (this->Previous->Previous->Previous && this->Previous->Previous->Previous->is (tok::l_square)) && 
+      (this->Previous->Previous->Previous->Previous && this->Previous->Previous->Previous->Previous->is (tok::l_square)) 
+     ) {
+
+    newlinescount = 1;
+    return true;
+  }
+
+  return false;
 }
 
 TokenRole::~TokenRole() {}
