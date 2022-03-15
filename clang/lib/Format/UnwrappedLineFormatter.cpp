@@ -861,6 +861,7 @@ private:
 /// Formatter that keeps the existing line breaks.
 class NoColumnLimitLineFormatter : public LineFormatter {
 public:
+
   NoColumnLimitLineFormatter(ContinuationIndenter *Indenter,
                              WhitespaceManager *Whitespaces,
                              const FormatStyle &Style,
@@ -869,24 +870,17 @@ public:
 
   /// Formats the line, simply keeping all of the input's line breaking
   /// decisions.
+
   unsigned formatLine(const AnnotatedLine &Line, unsigned FirstIndent,
                       unsigned FirstStartColumn, bool DryRun) override {
     assert(!DryRun);
-    LineState State = Indenter->getInitialState(FirstIndent, FirstStartColumn,
-                                                &Line, /*DryRun=*/false);
+      LineState State = Indenter->getInitialState(FirstIndent, FirstStartColumn, &Line, /*DryRun=*/false);
+
     while (State.NextToken) {
-      // TALLY: Customized line breaking logic
-      bool Newline =
-        State.NextToken->NewlinesBefore > 0 &&
-        (
-          Indenter->mustBreak(State) || 
-          (State.NextToken->OriginalLineBreakWeight > 5 && State.NextToken->isNot(tok::l_brace))
-        );
-/*
-          Indenter->mustBreak(State) ||
-          (Indenter->canBreak(State) && State.NextToken->NewlinesBefore > 0);
-*/
-      unsigned Penalty = 0;
+
+        bool Newline = State.NextToken->NewlinesBefore > 0;
+        unsigned Penalty = 0;
+
       formatChildren(State, Newline, /*DryRun=*/false, Penalty);
       Indenter->addTokenToState(State, Newline, /*DryRun=*/false);
     }
@@ -1131,8 +1125,7 @@ unsigned UnwrappedLineFormatter::format(
          Line->First->isTemplatizedFriendSpecifier() ||
          (Line->startsWith (tok::hash) || Line->InPPDirective) ||
          Line->startsWith (tok::kw_using) ||
-         (Line->startsWith(tok::kw_constexpr) || Line->startsWith(tok::kw_static, tok::kw_constexpr)) ||
-         Line->hasStringLiteral ())) {
+         (Line->startsWith(tok::kw_constexpr) || Line->startsWith(tok::kw_static, tok::kw_constexpr)))) {
         markFinalized (Line->First);
     }
 
@@ -1173,7 +1166,7 @@ unsigned UnwrappedLineFormatter::format(
       bool IsFunctionDefinitionLine = TheLine.MightBeFunctionDecl && !TheLine.Last->isOneOf(tok::semi, tok::comment);
 
       if (IsFunctionDefinitionLine)
-        Penalty += OptimizingLineFormatter(Indenter, Whitespaces, Style, this)
+        Penalty += NoColumnLimitLineFormatter(Indenter, Whitespaces, Style, this)
                        .formatLine(TheLine, NextStartColumn + Indent,
                                    FirstLine ? FirstStartColumn : 0, DryRun);
       else

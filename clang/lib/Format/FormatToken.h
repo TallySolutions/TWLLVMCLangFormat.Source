@@ -963,7 +963,7 @@ struct FormatToken {
                   const FormatToken* MyNext2 = MyNext->getNextNonComment();
                   if (MyNext2) {
                       const FormatToken* MyNext3 = MyNext2->getNextNonComment();
-                      if (MyNext3->isOneOf(tok::equal, tok::semi, tok::l_square, tok::comma)) {
+                      if (MyNext3 && MyNext3->isOneOf(tok::equal, tok::semi, tok::l_square, tok::comma)) {
                           nextOk = true;
                       }
                   }
