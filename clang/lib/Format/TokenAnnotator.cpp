@@ -2426,7 +2426,10 @@ void TokenAnnotator::walkLine1(AnnotatedLine& Line) {
             // Compute state
 
             if (MyToken->isOneOf(tok::kw_class, tok::kw_struct, tok::kw_union, tok::kw_enum)) {
-                if (MyToken->is(tok::kw_class) && Line.First->is(tok::kw_class)) {
+                if (MyToken->is(tok::kw_class)) {
+                    if (MyToken->Previous && MyToken->Previous->is(tok::kw_friend) == true)
+                        continue;
+
                     IsClassScope = true;
                     const FormatToken* Next = MyToken->getNextNonComment();
                     if (Next) {

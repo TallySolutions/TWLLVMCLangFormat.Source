@@ -640,7 +640,7 @@ struct FormatToken {
   // TALLY: Helper function
   bool isConstructor() const {
       const FormatToken* MyPrev = getPreviousNonComment();
-      if (MyPrev && MyPrev->is(tok::tilde)) {
+      if (MyPrev) {
           return false;
       }
 
