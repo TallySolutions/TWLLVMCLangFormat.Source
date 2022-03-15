@@ -99,7 +99,6 @@ const tooling::Replacements& WhitespaceManager::generateReplacements() {
     //columnarizePPKeywords();                              // TALLY
     //columnarizePPDefineKeyword();                         // TALLY. We do NOT use alignConsecutiveMacros().
     
-    columnarizeEnumLine ();
     columnarizeDeclarationSpecifierTokens();              // TALLY
     columnarizeDatatypeTokens();                          // TALLY
     columnarizeNoDiscardOrNoReturnOrTemplate ();          // TALLY
@@ -115,7 +114,7 @@ const tooling::Replacements& WhitespaceManager::generateReplacements() {
     alignConsecutiveLBraceOfConstexpr();                          // TALLY
 
     alignChainedConditionals();
-    alignTrailingComments();
+    alignTrailingComments();;
     alignEscapedNewlines();
 
     generateChanges();
@@ -984,50 +983,6 @@ void WhitespaceManager::columnarizePPDefineKeyword() {
         }
     }
 }
-
-/// TALLY: Columnarize specific tokens over all \c Changes.
-void WhitespaceManager::columnarizeEnumLine()
-{
-    bool inside = false;
-
-    for (int i = 0; i < Changes.size(); ++i) {
-        if (Changes[i].Tok->IsEnumScope == false)
-            continue;
-
-        if (Changes[i].Tok->is(tok::kw_enum)) {
-            Changes[i].Spaces = 0;
-        } 
-        else if (Changes[i].Tok->is(tok::r_brace)) {
-            Changes[i].Spaces = 0;
-            Changes[i].NewlinesBefore = 1;
-            inside = false;
-        }
-        else if (Changes[i].Tok->is(tok::l_brace)) {
-            inside = true;
-        } 
-        else if (inside) {
-            if(Changes[i].Tok->is (tok::comma))
-                Changes[i].Spaces = 0;
-            else {
-                if (Changes[i].Tok->is(tok::equal) || 
-                    Changes[i].IsTrailingComment || 
-                    Changes[i].Tok->is(tok::numeric_constant) ||
-                    Changes[i].Tok->is(tok::minus)) {
-                    Changes[i].Spaces = 1;
-                }
-                else {
-                    Changes[i].Spaces = 4;
-                    Changes[i].NewlinesBefore = 1;
-                }
-            }
-
-        }
-
-        if (Changes[i].StartOfTokenColumn >= 4)
-            Changes[i].StartOfTokenColumn -= 4;
-    }
-}
-
 
 /// TALLY: Columnarize specific tokens over all \c Changes.
 // TODO: Check 'template' use-cases and adapt

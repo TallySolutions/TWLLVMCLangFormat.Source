@@ -213,9 +213,6 @@ private:
 
   /// TALLY: Columnarize specific tokens over all \c Changes.
   void columnarizePPDefineKeyword();
-
-  /// TALLY: Columnarize specific tokens over all \c Changes.
-  void columnarizeEnumLine();
   
   /// TALLY: Columnarize specific tokens over all \c Changes.
   void columnarizeDeclarationSpecifierTokens();

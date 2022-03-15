@@ -2611,7 +2611,7 @@ void TokenAnnotator::walkLine2(AnnotatedLine& Line) {
             }
 
             // Datatype
-            if (MyToken->isDatatypeInner()) {
+            if (MyToken->isDatatypeInner() &&  (MyToken->Previous == nullptr || MyToken->Previous->is(tok::kw_return) == false) && MyToken->IsEnumScope == false) {
                 if (DtToken == nullptr)
                     DtToken = MyToken;
 
