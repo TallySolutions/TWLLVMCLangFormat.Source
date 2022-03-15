@@ -2447,6 +2447,7 @@ void TokenAnnotator::walkLine1(AnnotatedLine& Line) {
                     IsUnionScope = true;
                 }
                 if (MyToken->is(tok::kw_enum)) {
+                    MyToken->IsEnumScope = true;
                     if (MyToken->Next->is(tok::kw_class))
                         MyToken = MyToken->Next;
 

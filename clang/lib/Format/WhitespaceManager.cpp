@@ -98,6 +98,7 @@ const tooling::Replacements& WhitespaceManager::generateReplacements() {
     
     //columnarizePPKeywords();                              // TALLY
     //columnarizePPDefineKeyword();                         // TALLY. We do NOT use alignConsecutiveMacros().
+    
     columnarizeEnumLine ();
     columnarizeDeclarationSpecifierTokens();              // TALLY
     columnarizeDatatypeTokens();                          // TALLY
@@ -990,7 +991,7 @@ void WhitespaceManager::columnarizeEnumLine()
     bool inside = false;
 
     for (int i = 0; i < Changes.size(); ++i) {
-        if (Changes[i].Tok->is (tok::kw_enum) == Changes[i].Tok->IsEnumScope)
+        if (Changes[i].Tok->IsEnumScope == false)
             continue;
 
         if (Changes[i].Tok->is(tok::kw_enum)) {
@@ -1364,14 +1365,27 @@ void WhitespaceManager::columnarizeIdentifierTokens() {
 
         if (MyTok->isMemberVarNameInDecl()) {
             size_t lenDiff = MaxDatatypeLen - MyTok->PrevTokenSizeForColumnarization;
+            
             Changes[i].Spaces = pad + lenDiff;
+            int j = i + 1;
+
+            while (j < Changes.size() && Changes[j].NewlinesBefore == 0) {
+                Changes [j].StartOfTokenColumn += lenDiff;
+                ++j;
+            }
         }
         else if (MyTok->isFunctionNameAndPrevIsPointerOrRefOrDatatype()) {
             size_t lenDiff = MaxDatatypeLen - MyTok->PrevTokenSizeForColumnarization;
             Changes[i].Spaces = pad + lenDiff;
+            int j = i + 1;
 
             size_t tokSize = ((StringRef)MyTok->TokenText).size();
             MaxMemberNameLen = MaxMemberNameLen < tokSize ? tokSize : MaxMemberNameLen;
+
+            while (j < Changes.size() && Changes[j].NewlinesBefore == 0) {
+                Changes [j].StartOfTokenColumn += lenDiff;
+                ++j;
+            }
 
             if (NextTok)
                 NextTok->PrevTokenSizeForColumnarization = tokSize;
@@ -1704,12 +1718,10 @@ void WhitespaceManager::alignTrailingComments() {
     unsigned ChangeMinColumn = Changes[i].StartOfTokenColumn;
     unsigned ChangeMaxColumn;
 
-	// TALLY
-    unsigned ColumnLimitInEffect = Changes[i].Tok && Changes[i].Tok->MyLine && Changes[i].Tok->MyLine->InPPDirective ? Style.ColumnLimitExtended : Style.ColumnLimit;
-    if (ColumnLimitInEffect == 0)
+    if (Style.ColumnLimit == 0)
       ChangeMaxColumn = UINT_MAX;
-    else if (ColumnLimitInEffect >= Changes[i].TokenLength)
-      ChangeMaxColumn = ColumnLimitInEffect - Changes[i].TokenLength;
+    else if (Style.ColumnLimit >= Changes[i].TokenLength)
+      ChangeMaxColumn = Style.ColumnLimit - Changes[i].TokenLength;
     else
       ChangeMaxColumn = ChangeMinColumn;
 
