@@ -813,10 +813,12 @@ void WhitespaceManager::alignConsecutiveAssignmentsOnVarNameWithinSection() {
     AlignTokens(Style,
         [&](const Change& C) {
 
-            return
+            bool retval = 
                 C.Tok->isVarNameInDecl() &&
                 C.Tok->HasSemiColonInLine &&
                 !C.Tok->IsClassScope;
+
+            return retval;
         },
         Changes, /*IgnoreScope=*/false, /*IgnoreCommas=*/false, /*StartAt=*/0,
             /*MaxNewlinesBeforeSectionBreak=*/2, /*NonMatchingLineBreaksSection=*/true,

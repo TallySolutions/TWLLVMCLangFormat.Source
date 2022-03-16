@@ -921,7 +921,7 @@ struct FormatToken {
               }
           }
       }
-      else if (is(tok::r_square)) {
+      /*else if (is(tok::r_square)) {
           const FormatToken* MyPrev = getPreviousNonComment();
           while (MyPrev && !MyPrev->is(tok::l_square)) {
               MyPrev = MyPrev->getPreviousNonComment();
@@ -932,7 +932,7 @@ struct FormatToken {
                   return MyPrev->isVarNameInDecl();
               }
           }
-      }
+      }*/
 
       return prevOk && nextOk;
   }
@@ -974,7 +974,7 @@ struct FormatToken {
   }
 
   //TALLY: Helper function to check if the lbrace is part of a constexpr
-  bool isLBraceOfConstexprDecl() const  {
+  bool isLBraceOfConstexprOrVarDelcOrDef() const  {
 
 
       if (is(tok::l_brace)) {
