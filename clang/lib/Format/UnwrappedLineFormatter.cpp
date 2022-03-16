@@ -1121,11 +1121,9 @@ unsigned UnwrappedLineFormatter::format(
     /// TALLY : Ignore the lines that we dont want to format. Currently variables declared as maybe_unused or template based friend class.
     ///          Line containing string literal. Hence for these, we do not need to employ clang-format off 
     if (Line && 
-        (Line->First->isMaybeUnused() || 
-         Line->First->isTemplatizedFriendSpecifier() ||
+        (Line->First->isTemplatizedFriendSpecifier() ||
          (Line->startsWith (tok::hash) || Line->InPPDirective) ||
-         Line->startsWith (tok::kw_using) ||
-         (Line->startsWith(tok::kw_constexpr) || Line->startsWith(tok::kw_static, tok::kw_constexpr)))) {
+         Line->startsWith (tok::kw_using))) {
         markFinalized (Line->First);
     }
 

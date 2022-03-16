@@ -963,7 +963,7 @@ struct FormatToken {
                   const FormatToken* MyNext2 = MyNext->getNextNonComment();
                   if (MyNext2) {
                       const FormatToken* MyNext3 = MyNext2->getNextNonComment();
-                      if (MyNext3 && MyNext3->isOneOf(tok::equal, tok::semi, tok::l_square, tok::comma)) {
+                      if (MyNext3 && MyNext3->isOneOf(tok::equal, tok::semi, tok::l_square, tok::comma, tok::l_brace)) {
                           nextOk = true;
                       }
                   }
@@ -975,15 +975,40 @@ struct FormatToken {
 
   //TALLY: Helper function to check if the lbrace is part of a constexpr
   bool isLBraceOfConstexprDecl() const  {
+
+
       if (is(tok::l_brace)) {
           FormatToken * prev = getPreviousNonComment();
+          FormatToken * scopevar = nullptr;
 
           while (prev) {
               if (prev->is(tok::kw_constexpr))
                   return true;
 
+              if (prev->isOneOf (tok::kw_class, tok::kw_struct, tok::kw_if, tok::kw_while, tok::kw_do, tok::kw_else, tok::kw_union))
+                  return false;
+
+              if (prev->is(tok::coloncolon))
+                  scopevar = prev;
+
               prev = prev->getPreviousNonComment();
           }
+
+          if (scopevar) {
+              FormatToken * prevtoscope =  scopevar->getPreviousNonComment();
+              if (prevtoscope)
+                  if (prevtoscope->isDatatype())
+                      return true;
+          }
+
+          prev = getPreviousNonComment();
+
+          if (prev) {
+              prev = prev->getPreviousNonComment();
+              if(prev && prev->isDatatype())
+                  return true;
+          }
+
       }
       return false;
   }

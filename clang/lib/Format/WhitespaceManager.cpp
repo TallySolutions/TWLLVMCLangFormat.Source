@@ -111,7 +111,7 @@ const tooling::Replacements& WhitespaceManager::generateReplacements() {
     alignConsecutiveVarBitFields();                       // TALLY. We do NOT use alignConsecutiveBitFields().
     alignConsecutiveAssignmentsOnEqualsAcrossSections();  // TALLY
     alignConsecutiveAssignmentsOnEqualsWithinSection();   // TALLY
-    alignConsecutiveLBraceOfConstexpr();                          // TALLY
+    alignConsecutiveLBraceOfVarDeclOrDef();               // TALLY
 
     alignChainedConditionals();
     alignTrailingComments();;
@@ -755,9 +755,11 @@ void WhitespaceManager::alignConsecutiveAssignmentsOnScopedVarName() {
     AlignTokens(Style,
         [&](const Change& C) {
 
-            return
-                C.Tok->isScopedVarNameInDecl() &&
-                C.Tok->HasSemiColonInLine;
+            bool retval = 
+                (C.Tok->isScopedVarNameInDecl() &&
+                C.Tok->HasSemiColonInLine);
+
+            return retval;
         },
         Changes, /*IgnoreScope=*/false, /*IgnoreCommas=*/false, /*StartAt=*/0,
             /*MaxNewlinesBeforeSectionBreak=*/2, /*NonMatchingLineBreaksSection=*/true,
@@ -766,19 +768,19 @@ void WhitespaceManager::alignConsecutiveAssignmentsOnScopedVarName() {
 }
 
 // TALLY : Align the consecutive constexprs
-void WhitespaceManager::alignConsecutiveLBraceOfConstexpr() {
+void WhitespaceManager::alignConsecutiveLBraceOfVarDeclOrDef() {
     if (!Style.AlignConsecutiveAssignments)
         return;
 
     AlignTokens(Style,
         [&](const Change& C) {
-            return C.Tok->isLBraceOfConstexprDecl() && 
+            return C.Tok->isLBraceOfConstexprOrVarDelcOrDef() && 
                    C.Tok->HasSemiColonInLine; // Ensure is terminated by a semi colon.
         },
         Changes, /*IgnoreScope=*/false, /*IgnoreCommas=*/false, /*StartAt=*/0,
             /*MaxNewlinesBeforeSectionBreak=*/2, /*NonMatchingLineBreaksSection=*/true,
             /*AllowBeyondColumnLimitForAlignment=*/true, /*MaxLeadingSpacesForAlignment=*/UINT_MAX, 
-            /*ForceAlignToFourSpaces*/false);
+            /*ForceAlignToFourSpaces*/true);
 }
 
 // TALLY: Align assignments on variable name (ACROSS SECTIONS)
