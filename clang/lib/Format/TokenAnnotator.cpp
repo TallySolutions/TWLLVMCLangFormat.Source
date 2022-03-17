@@ -864,7 +864,9 @@ private:
         }
       } else if (Contexts.back().ColonIsForRangeExpr) {
         Tok->setType(TT_RangeBasedForLoopColon);
-      } else if (CurrentToken && CurrentToken->is(tok::numeric_constant)) {
+      } else if (CurrentToken && (CurrentToken->is(tok::numeric_constant)
+          /// TALLY : The BitFied can be an identifier aswell.
+          || CurrentToken->is(tok::identifier))) {
         Tok->setType(TT_BitFieldColon);
       } else if (Contexts.size() == 1 &&
                  !Line.First->isOneOf(tok::kw_enum, tok::kw_case)) {
@@ -2427,10 +2429,12 @@ void TokenAnnotator::walkLine1(AnnotatedLine& Line) {
 
             if (MyToken->isOneOf(tok::kw_class, tok::kw_struct, tok::kw_union, tok::kw_enum)) {
                 if (MyToken->is(tok::kw_class)) {
-                    if (MyToken->Previous && MyToken->Previous->is(tok::kw_friend) == true)
+                    if (MyToken->Previous && MyToken->Previous->is(tok::kw_friend) == true || 
+                        (Line.endsWith(tok::semi) && !(Line.endsWith(tok::semi, tok::r_brace))))
                         continue;
-
+                    
                     IsClassScope = true;
+
                     const FormatToken* Next = MyToken->getNextNonComment();
                     if (Next) {
                         ClassScopeName = Next->TokenText;
@@ -2611,7 +2615,8 @@ void TokenAnnotator::walkLine2(AnnotatedLine& Line) {
             }
 
             // Datatype
-            if (MyToken->isDatatypeInner() &&  (MyToken->Previous == nullptr || MyToken->Previous->is(tok::kw_return) == false) && MyToken->IsEnumScope == false) {
+            if (MyToken->isDatatypeInner() &&  (MyToken->Previous == nullptr || MyToken->Previous->is(tok::kw_return) == false) && MyToken->IsEnumScope == false /*&&
+                (MyToken->Previous && MyToken->Previous->Previous && MyToken->isMaybeUnused() == false)*/) {
                 if (DtToken == nullptr)
                     DtToken = MyToken;
 
@@ -2641,7 +2646,7 @@ void TokenAnnotator::walkLine2(AnnotatedLine& Line) {
                 const FormatToken* Next = MyToken->getNextNonComment();
 
                 // Function name
-                if ((MyToken->isFunctionName() && Next && Next->is(tok::l_paren) && MyToken->Previous->isDatatype() == false) || 
+                if ((MyToken->isFunctionName() && Next && Next->is(tok::l_paren) && MyToken->Previous && MyToken->Previous->isDatatype() == false) || 
                     (MyToken->isFunctionName() && Next && Next->is(tok::l_paren) && (MyToken->IsClassScope || MyToken->IsStructScope))) {
                     MyToken->IsFunctionName = true;
                     DtToken->IsDatatype = true;
@@ -2660,7 +2665,7 @@ void TokenAnnotator::walkLine2(AnnotatedLine& Line) {
                           nextOk = true;
                         else if (Next->is(tok::colon)) {
                             const FormatToken* MyNext2 = Next->getNextNonComment();
-                            if (MyNext2 && MyNext2->is(tok::numeric_constant)) {
+                            if (MyNext2 && (MyNext2->is(tok::numeric_constant) || MyNext2->is(tok::identifier) )) {
                                 nextOk = true;
                             }
                         }

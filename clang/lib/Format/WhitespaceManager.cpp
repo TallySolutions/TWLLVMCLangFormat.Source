@@ -112,6 +112,7 @@ const tooling::Replacements& WhitespaceManager::generateReplacements() {
     alignConsecutiveAssignmentsOnEqualsAcrossSections();  // TALLY
     alignConsecutiveAssignmentsOnEqualsWithinSection();   // TALLY
     alignConsecutiveLBraceOfVarDeclOrDef();               // TALLY
+    alignConsecutiveAssignementsOnUsing ();               // TALLY
 
     alignChainedConditionals();
     alignTrailingComments();;
@@ -783,6 +784,26 @@ void WhitespaceManager::alignConsecutiveLBraceOfVarDeclOrDef() {
             /*ForceAlignToFourSpaces*/true);
 }
 
+void WhitespaceManager::alignConsecutiveAssignementsOnUsing () {
+    if (!Style.AlignConsecutiveAssignments)
+        return;
+
+    AlignTokens(Style,
+        [&](const Change& C) {
+            bool retval =  (C.Tok->MyLine && C.Tok->MyLine->First &&
+                            C.Tok->MyLine->First->is(tok::kw_using) &&
+                            C.Tok->HasSemiColonInLine && 
+                            C.Tok->Previous && C.Tok->Previous->Previous && C.Tok->Previous->Previous == C.Tok->MyLine->First &&
+                            C.Tok->is(tok::equal));
+
+            return retval;
+        },
+        Changes, /*IgnoreScope=*/false, /*IgnoreCommas=*/false, /*StartAt=*/0,
+            /*MaxNewlinesBeforeSectionBreak=*/2, /*NonMatchingLineBreaksSection=*/true,
+            /*AllowBeyondColumnLimitForAlignment=*/true, /*MaxLeadingSpacesForAlignment=*/UINT_MAX, 
+            /*ForceAlignToFourSpaces*/true);
+}
+
 // TALLY: Align assignments on variable name (ACROSS SECTIONS)
 // Mutually exclusive with alignConsecutiveAssignmentsOnVarNameWithinSection()
 void WhitespaceManager::alignConsecutiveAssignmentsOnVarNameAcrossSections() {
@@ -1142,7 +1163,10 @@ void WhitespaceManager::columnarizeDatatypeTokens() {
         bool functionNameAfterInterims = MyTok->isFunctionNameAfterInterims();
         bool memVarNameAfterInterims = MyTok->isMemberVariableNameAfterInterims();
 
-      if (functionNameAfterInterims || memVarNameAfterInterims) {
+        bool ismaybeunused = (MyTok->Previous && MyTok->Previous->Previous && MyTok->Previous->Previous->isMaybeUnused() && MyLine->First == MyTok->Previous->Previous);
+
+      if (functionNameAfterInterims || memVarNameAfterInterims || ismaybeunused) {
+          int j = ismaybeunused ? i - 2 : i;
 
           size_t tokSize = ((StringRef)MyTok->TokenText).size();
 
@@ -1156,7 +1180,17 @@ void WhitespaceManager::columnarizeDatatypeTokens() {
           interimSize += ((StringRef)NextTok->TokenText).size();
           NextTok = NextTok->getNextNonCommentNonConst();
         }
-        tokSize += interimSize;
+
+        if (ismaybeunused) {
+          NextTok = NextTok->getNextNonCommentNonConst ();
+          if (NextTok) {
+            NextTok = NextTok->getNextNonCommentNonConst();
+            NextTok->PrevTokenSizeForColumnarization = tokSize;
+            NextTok->IsDatatype = true;
+          }
+        }
+
+        tokSize = ismaybeunused ? 4 + tokSize : interimSize + tokSize;
 
         if (NextTok) {
 
@@ -1169,22 +1203,22 @@ void WhitespaceManager::columnarizeDatatypeTokens() {
 
         MaxDatatypeLen = MaxDatatypeLen < tokSize ? tokSize : MaxDatatypeLen;
 
-        if (MyLine->LastSpecifierTabs == 0) {
+        if (MyLine->LastSpecifierTabs == 0 || MyLine->First->isMaybeUnused()) {
 
-          Changes[i].Spaces = MaxSpecifierTabs * Style.TabWidth;
+          Changes[j].Spaces = MaxSpecifierTabs * Style.TabWidth;
           MyLine->LastSpecifierTabs = MaxSpecifierTabs;
         }
         else if (MyLine->LastSpecifierTabs < MaxSpecifierTabs) {
 
-          Changes[i].Spaces = ((MaxSpecifierTabs - MyLine->LastSpecifierTabs) * Style.TabWidth) + MyLine->LastSpecifierPadding;
+          Changes[j].Spaces = ((MaxSpecifierTabs - MyLine->LastSpecifierTabs) * Style.TabWidth) + MyLine->LastSpecifierPadding;
           MyLine->LastSpecifierTabs = MaxSpecifierTabs;
         }
         else if (MyLine->LastSpecifierTabs == MaxSpecifierTabs) {
 
-          Changes[i].Spaces = MyLine->LastSpecifierPadding;
+          Changes[j].Spaces = MyLine->LastSpecifierPadding;
         }
 
-        Changes[i].StartOfTokenColumn = MaxSpecifierTabs * Style.TabWidth;
+        Changes[j].StartOfTokenColumn = MaxSpecifierTabs * Style.TabWidth;
       }
     }
   }
@@ -1318,6 +1352,10 @@ void WhitespaceManager::columnarizeIdentifierTokens() {
         const FormatToken* MyTok = Changes[i].Tok;
 
         if ((!(MyTok->IsClassScope || MyTok->IsStructScope)) || MyTok->LbraceCount == 0 || MyTok->LparenCount > 0)
+            continue;
+
+        // Dont align bitfield specifiers.
+        if (MyTok->Previous && MyTok->Previous->is(TT_BitFieldColon))
             continue;
 
         FormatToken* NextTok = MyTok->getNextNonCommentNonConst();

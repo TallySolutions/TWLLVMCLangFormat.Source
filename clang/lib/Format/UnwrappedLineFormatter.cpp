@@ -1118,12 +1118,13 @@ unsigned UnwrappedLineFormatter::format(
            Joiner.getNextMergedLine(DryRun, IndentTracker);
        Line; Line = NextLine, FirstLine = false) {
 
-    /// TALLY : Ignore the lines that we dont want to format. Currently variables declared as maybe_unused or template based friend class.
+    /// TALLY : Ignore the lines that we dont want to format. Currently  template based friend class.
     ///          Line containing string literal. Hence for these, we do not need to employ clang-format off 
-    if (Line && 
+    if (Line && Line->First &&  
         (Line->First->isTemplatizedFriendSpecifier() ||
          (Line->startsWith (tok::hash) || Line->InPPDirective) ||
-         Line->startsWith (tok::kw_using))) {
+         Line->First->TokenText.equals("TW_CHECK_UDT_SIZE")
+         )) {
         markFinalized (Line->First);
     }
 
@@ -1348,8 +1349,12 @@ void UnwrappedLineFormatter::formatFirstToken(
 
   // TALLY: Add extra new line at the end of a double-indented block
   if (PreviousLine && PreviousLine->IsDoubleIndented && !Line.IsDoubleIndented &&
-      RootToken.isNot(tok::comment) && RootToken.NewlinesBefore == 1)
-      ++Newlines;
+      RootToken.isNot(tok::comment) && RootToken.NewlinesBefore == 1) {
+
+      if (!((PreviousLine->First->IsClassScope || PreviousLine->First->IsStructScope) && 
+          (Line.First->IsClassScope == false || Line.First->IsStructScope == false)))
+        ++Newlines;
+  }
 
   if (Newlines)
     Indent = NewlineIndent;

@@ -184,6 +184,9 @@ private:
   /// TALLY: Align consecutive assignments over all \c Changes.
   void alignConsecutiveAssignmentsOnScopedVarName();
 
+  /// TALLY : Align 'using' based assignments; 
+  void alignConsecutiveAssignementsOnUsing ();
+
   /// TALLY: Align consecutive assignments over all \c Changes.
   void alignConsecutiveAssignmentsOnVarNameAcrossSections();
 
