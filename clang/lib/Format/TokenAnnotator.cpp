@@ -2631,9 +2631,9 @@ void TokenAnnotator::walkLine2(AnnotatedLine& Line) {
                     DtToken = MyToken;
 
                 // Interim
-                FormatToken* Next;
+                FormatToken* Next = MyToken;
                 do {
-                    Next = MyToken->getNextNonCommentNonConst();
+                    Next = Next->getNextNonCommentNonConst();
 
                     if (!Next) {
                         break;
@@ -2642,11 +2642,11 @@ void TokenAnnotator::walkLine2(AnnotatedLine& Line) {
                     if (Next->is(tok::less)) 
                         ++templatebracecount;
 
-                    if (Next->is(tok::greater))
-                        --templatebracecount;
-
                     if(templatebracecount)
                         Next->IsInterimBeforeName = true;
+                    
+                    if (Next->is(tok::greater))
+                        --templatebracecount;
 
                 } while (templatebracecount);
                 

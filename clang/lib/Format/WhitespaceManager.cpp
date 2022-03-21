@@ -92,7 +92,7 @@ const tooling::Replacements& WhitespaceManager::generateReplacements() {
     if (Changes.empty())
         return Replaces;
 
-    llvm::sort(Changes, Change::IsBeforeInFile(SourceMgr));
+    llvm::sort(Changes, Change::IsBeforeInFile(SourceMgr));;
     calculateLineBreakInformation();
 
     
