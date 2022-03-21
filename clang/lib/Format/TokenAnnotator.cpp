@@ -2567,12 +2567,25 @@ void TokenAnnotator::walkLine1(AnnotatedLine& Line) {
 // TALLY: Walk the line in forward direction
 void TokenAnnotator::walkLine2(AnnotatedLine& Line) {
 
+    int templatebracecount = 0;
+
     // First loop for 'IsRhsToken'
     FormatToken* MyToken = Line.First;
     if (MyToken) {
         for (MyToken = Line.First; MyToken != nullptr; MyToken = MyToken->Next) {
             if (MyToken->isNotScoped())
                 continue;
+
+            if (MyToken->is(TT_TemplateOpener) && MyToken->Previous && MyToken->Previous->is(tok::kw_template))
+                ++templatebracecount;
+
+            if (templatebracecount != 0) {
+                
+                if (MyToken->is(TT_TemplateCloser))
+                    --templatebracecount;
+
+                continue;
+            }
 
             bool nonAlignasLParen = MyToken->is(tok::l_paren) && MyToken->Previous && !MyToken->Previous->is(tok::kw_alignas);
 
@@ -2592,26 +2605,23 @@ void TokenAnnotator::walkLine2(AnnotatedLine& Line) {
 
     // Second loop for 'IsVariableNameWithDatatype', 'IsFunctionName', and 'IsDatatype'
     FormatToken* DtToken = nullptr;
-    int bracecount = 0;
+    templatebracecount = 0;
     MyToken = Line.First;
     if (MyToken) {
         for (MyToken = Line.First; MyToken != nullptr; MyToken = MyToken->Next) {
-            if (MyToken->IsInterimBeforeName || MyToken->IsRhsToken || MyToken->isNotScoped() || MyToken->isParenScoped())
+            if (templatebracecount == 0 && (MyToken->IsInterimBeforeName || MyToken->IsRhsToken || MyToken->isNotScoped() || MyToken->isParenScoped()))
                 // Basically a template type, then move to next token.
                 continue;
 
-            if (MyToken->is(tok::less) && MyToken->Previous->is(tok::kw_template)) {
+            if (MyToken->is(TT_TemplateOpener) && MyToken->Previous && MyToken->Previous->is(tok::kw_template))
+                ++templatebracecount;
 
-                ++bracecount;
+            if (templatebracecount != 0) {
+                
+                if (MyToken->is(TT_TemplateCloser))
+                    --templatebracecount;
+
                 continue;
-            }
-
-            if (bracecount) {
-
-              if (MyToken->is(tok::greater))
-                --bracecount;
-              
-              continue;
             }
 
             // Datatype
@@ -2621,18 +2631,26 @@ void TokenAnnotator::walkLine2(AnnotatedLine& Line) {
                     DtToken = MyToken;
 
                 // Interim
-                FormatToken* Next = MyToken->getNextNonCommentNonConst();
-                if (Next && Next->is(tok::less)) {
-                    Next->IsInterimBeforeName = true;
-                    Next = Next->getNextNonCommentNonConst();
-                    while (Next && !Next->is(tok::greater)) {
-                        Next->IsInterimBeforeName = true;
-                        Next = Next->getNextNonCommentNonConst();
+                FormatToken* Next;
+                do {
+                    Next = MyToken->getNextNonCommentNonConst();
+
+                    if (!Next) {
+                        break;
                     }
-                    if (Next && Next->is(tok::greater)) {
+
+                    if (Next->is(tok::less)) 
+                        ++templatebracecount;
+
+                    if (Next->is(tok::greater))
+                        --templatebracecount;
+
+                    if(templatebracecount)
                         Next->IsInterimBeforeName = true;
-                    }
-                }
+
+                } while (templatebracecount);
+                
+                templatebracecount = 0;
 
                 // Interim
                 while (Next && (Next->isOneOf(tok::star, tok::amp) || Next->isPointerOrRef())) {
