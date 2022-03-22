@@ -207,6 +207,9 @@ public:
   /// TALLY : If in function definition Line. and not body.
   bool IsFunctionDefinitionLine = false;
 
+  /// TALLY : If in template Line Basically in arrow braces inside expression of type. template <>.
+  bool IsInTemplateLine = false;
+
   /// TALLY: Name of the struct (if any) a given token is scoped under
   StringRef StructScopeName = "<StructScopeName_None>";
 
@@ -224,6 +227,12 @@ public:
 
   /// TALLY: R-Paren count
   unsigned RparenCount = 0;
+  
+  /// TALLY: template opener count.
+  unsigned LArrowCount = 0;
+
+  /// TALLY: template closer count.
+  unsigned RArrowCount = 0;
 
   /// TALLY: A weight to determine whether line break in the original must be enforced
   unsigned OriginalLineBreakWeight = 0;

@@ -400,6 +400,9 @@ struct FormatToken {
   /// TALLY: If this token in a function name
   bool IsFunctionName = false;
 
+  /// TALLY: If this token in part of content inside arrow braces of expression of type template<...>
+  bool IsInTemplateLine = false;
+
   // TALLY: Previous non-comment token is
   bool prevNonCommIs(tok::TokenKind Kind) const {
       FormatToken* prevNonComm = getPreviousNonComment();
@@ -894,10 +897,12 @@ struct FormatToken {
               if (MyPrev->isDatatype()) {
                   prevOk = true;
               }
-              else if (MyPrev->isPointerOrRef()) {
-                  const FormatToken* MyPrevPrev = MyPrev->getPreviousNonComment();
+              else if (MyPrev->IsInterimBeforeName) {
+                  while (MyPrev && MyPrev->IsInterimBeforeName)
+                      MyPrev = MyPrev->getPreviousNonComment();
+
                   // Also support pointer-to-pointer i.e. two or more levels of indirection. Suffices to stop after two-level checking.
-                  if (MyPrevPrev && (MyPrevPrev->isDatatype() || MyPrevPrev->isPointerOrRef())) {
+                  if (MyPrev && (MyPrev->isDatatype() || MyPrev->isPointerOrRef())) {
                       prevOk = true;
                   }
               }

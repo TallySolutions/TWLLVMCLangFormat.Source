@@ -842,7 +842,7 @@ void WhitespaceManager::alignConsecutiveAssignmentsOnVarNameWithinSection() {
             return retval;
         },
         Changes, /*IgnoreScope=*/false, /*IgnoreCommas=*/false, /*StartAt=*/0,
-            /*MaxNewlinesBeforeSectionBreak=*/2, /*NonMatchingLineBreaksSection=*/true,
+            /*MaxNewlinesBeforeSectionBreak=*/2, /*NonMatchingLineBreaksSection=*/false,
             /*AllowBeyondColumnLimitForAlignment=*/true, /*MaxLeadingSpacesForAlignment=*/UINT_MAX,
             /*ForceAlignToFourSpaces*/true);
 }
