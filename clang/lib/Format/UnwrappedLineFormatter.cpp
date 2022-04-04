@@ -878,7 +878,11 @@ public:
 
     while (State.NextToken) {
 
-        bool Newline = State.NextToken->NewlinesBefore > 0;
+        bool Newline = State.NextToken->NewlinesBefore > 0 && 
+            (
+                Indenter->mustBreak(State) ||
+                (State.NextToken->OriginalLineBreakWeight > 5 && State.NextToken->isNot(tok::l_brace))
+            );
         unsigned Penalty = 0;
 
       formatChildren(State, Newline, /*DryRun=*/false, Penalty);
@@ -1121,10 +1125,8 @@ unsigned UnwrappedLineFormatter::format(
     /// TALLY : Ignore the lines that we dont want to format. Currently  template based friend class.
     ///          Line containing string literal. Hence for these, we do not need to employ clang-format off 
     if (Line && Line->First &&  
-        (Line->First->isTemplatizedFriendSpecifier() ||
-         (Line->startsWith (tok::hash) || Line->InPPDirective) ||
-         Line->First->TokenText.equals("TW_CHECK_UDT_SIZE")
-         )) {
+        ((Line->startsWith (tok::hash) || Line->InPPDirective) ||
+         Line->First->TokenText.equals("TW_CHECK_UDT_SIZE"))) {
         markFinalized (Line->First);
     }
 

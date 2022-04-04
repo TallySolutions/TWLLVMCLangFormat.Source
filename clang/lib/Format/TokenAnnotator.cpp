@@ -2475,6 +2475,8 @@ void TokenAnnotator::walkLine1(AnnotatedLine& Line) {
                     LArrowCount = RArrowCount = 0;
                     MyToken->IsInTemplateLine = true;
                     IsInTemplateLine = false;
+                    if (MyToken->getNextNonComment() && IsFunctionDefinitionLine && LparenCount == 0)
+                        MyToken->getNextNonCommentNonConst()->NewlinesBefore = 1;
                 }
             }
             else if (MyToken->is(tok::l_brace)) {
@@ -2511,19 +2513,60 @@ void TokenAnnotator::walkLine1(AnnotatedLine& Line) {
                     if (IsInFunctionDefinition) {
                         IsInFunctionDefinition = false;
                     }
-
                 }
             }
             else if (MyToken->is(tok::l_paren)) {
                 LparenCount++;
 
-                OriginalLineBreakWeight += 2;
+                // Dont add weight for if/while statements.
+                if (MyToken->getPreviousNonComment() && MyToken->getPreviousNonComment()->isOneOf(tok::kw_if, tok::kw_while) == false)
+                    OriginalLineBreakWeight += 2;
 
                 // Add additional weight for a function declaration
                 if (hasSemiColon) {
                     const FormatToken* MyPrev = MyToken->getPreviousNonComment();
                     if (MyPrev && MyPrev->isFunctionOrCtorOrPrevIsDtor()) {
                         OriginalLineBreakWeight += 5;
+                    }
+                }
+
+                if (IsFunctionDefinitionLine) {
+                    FormatToken* MyPrev = MyToken->Previous;
+
+                    if (MyPrev) {
+                        if (MyPrev->Previous && MyPrev->Previous->is(tok::coloncolon)) {
+                            MyPrev = MyPrev->Previous->Previous;
+
+                            if (MyPrev && MyPrev->is(tok::greater)) {
+                            
+                                int arrowcount = 0;
+                                do {
+                                   if (MyPrev->is(tok::greater))
+                                       ++arrowcount;
+
+                                   if (MyPrev->is(tok::less))
+                                       --arrowcount;
+                                    
+                                   MyPrev = MyPrev->Previous;
+                                } while (arrowcount && MyPrev);
+                            }
+                            else if (MyPrev && MyPrev->is(tok::r_paren)) {
+                            
+                                int bracketcount = 0;
+                                do {
+                                   if (MyPrev->is(tok::r_paren))
+                                       ++bracketcount;
+
+                                   if (MyPrev->is(tok::l_paren))
+                                       --bracketcount;
+                                    
+                                   MyPrev = MyPrev->Previous;
+                                } while (bracketcount && MyPrev);
+                            }
+                        }
+
+                        if (MyPrev)
+                            MyPrev->NewlinesBefore = 1;
                     }
                 }
             }
@@ -2571,6 +2614,8 @@ void TokenAnnotator::walkLine1(AnnotatedLine& Line) {
             MyToken->IsFunctionDefinitionLine = IsFunctionDefinitionLine;
             MyToken->IsInFunctionDefinitionScope = IsInFunctionDefinition;
             MyToken->IsInTemplateLine = MyToken->IsInTemplateLine ? true : IsInTemplateLine;
+            MyToken->LArrowCount = LArrowCount;
+            MyToken->RArrowCount = RArrowCount;
         }
     }
 

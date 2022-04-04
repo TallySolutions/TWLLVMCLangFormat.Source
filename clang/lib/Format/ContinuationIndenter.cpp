@@ -517,7 +517,32 @@ bool ContinuationIndenter::mustBreak(const LineState &State) {
   if (State.NoContinuation)
     return true;
 
-  return false;
+
+  // TALLY : By default the newlines are honored. For few cases 
+  //          like start of function definition and conditional 
+  //          and loop expressions should have a rigid frame.
+  FormatToken *tokenlast;
+  FormatToken *tokenfirst;
+
+  if (State.Line)
+    tokenlast = State.Line->Last;
+    tokenfirst = State.Line->First;
+
+    if (tokenfirst && tokenfirst->isOneOf(tok::kw_else, tok::kw_while, tok::kw_do, tok::kw_if, tok::kw_for))
+      return !(State.NextToken->LparenCount == State.NextToken->RparenCount);
+
+    if (tokenlast && tokenlast->isTrailingComment())
+      tokenlast = tokenlast->getPreviousNonComment();
+
+    if (tokenfirst && tokenfirst->is(tok::r_brace) &&
+        tokenlast && tokenlast->isOneOf(tok::l_brace, tok::semi)) {
+
+      if (tokenfirst->getNextNonComment () &&
+          tokenfirst->getNextNonComment ()->isOneOf (tok::kw_else, tok::kw_while))
+        return !(State.NextToken->LparenCount == State.NextToken->RparenCount);
+    }
+
+  return true;
 }
 
 unsigned ContinuationIndenter::addTokenToState(LineState &State, bool Newline,

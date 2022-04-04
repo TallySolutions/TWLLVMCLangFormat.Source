@@ -1060,7 +1060,8 @@ void WhitespaceManager::columnarizeDeclarationSpecifierTokens() {
             else {
                 if (MyLine->LastSpecifierTabs == 0) {
                     MyLine->LastSpecifierTabs = 2;
-                    Changes[i].Spaces = MyLine->LastSpecifierTabs * Style.TabWidth;
+                    if (MyTok->is(tok::kw_friend))
+                        Changes[i].Spaces = MyTok->NewlinesBefore != 0 ? MyLine->LastSpecifierTabs * Style.TabWidth : 1;
                 }
                 else {
                     Changes[i].Spaces = MyLine->LastSpecifierPadding;
@@ -1228,7 +1229,6 @@ void WhitespaceManager::columnarizeDatatypeTokens() {
 void WhitespaceManager::columnarizeNoDiscardOrNoReturnOrTemplate() {
   int spacecount;
   int bracecount;
-  int zeroonecount = 0;
 
   if (!Style.AlignConsecutiveDeclarations)
     return;
@@ -1283,52 +1283,68 @@ void WhitespaceManager::columnarizeNoDiscardOrNoReturnOrTemplate() {
           }
         }
       }
+    
+      FormatToken * aftertemplate = (FormatToken * )MyTok->walkTemplateBlockInClassDecl();
+      bool isfrienddecl = aftertemplate ? aftertemplate->is(tok::kw_friend) : false;
 
-      if (MyTok->is(tok::kw_template)) {
+      if (MyTok->is(tok::kw_template) && 
+          MyTok->MyLine && 
+          (MyTok->MyLine->MightBeFunctionDecl || isfrienddecl)&& 
+          MyTok->MyLine->endsWith(tok::semi) && 
+          MyTok->LbraceCount > 0 && 
+          MyTok->LparenCount == 0 && 
+          MyTok->LArrowCount == 0) {
 
         spacecount = 0;
         bracecount = 0;
         
-        Changes[i].StartOfTokenColumn = MaxSpecifierTabs * Style.TabWidth;
-        Changes[i].Spaces = MaxSpecifierTabs * Style.TabWidth;
+        Changes[i].StartOfTokenColumn = isfrienddecl ? 8 : MaxSpecifierTabs * Style.TabWidth;
+        Changes[i].Spaces = isfrienddecl ? 8 : MaxSpecifierTabs * Style.TabWidth;;
 
         ++i;
         const FormatToken *curr = MyTok->Next;
 
-        do {
+        if (curr->is(tok::less)) {
+            spacecount = 0;
+            ++bracecount;
+        }
+
+        while (bracecount) {
+
+            curr = curr->getNextNonComment();
+            ++i;
+
             if (!curr)
                 break;
 
             if (curr->is(tok::less)) {
-                zeroonecount = 1;
+                spacecount = 0;
                 ++bracecount;
             }
 
             if (curr->is(tok::greater)) {
-                zeroonecount = 0;
+                spacecount = 0;
                 --bracecount;
             }
 
-            if ((curr->is(tok::comma) || curr->is(tok::ellipsis))) {
-                zeroonecount = 0;
+            if (curr->is(tok::comma) || curr->is(tok::ellipsis)) {
+                spacecount = 0;
             }
 
-            if (curr->is(tok::kw_template) ||
-                curr->is(tok::kw_typename) || 
+            if (curr->isOneOf (tok::kw_template, tok::kw_typename, tok::kw_class) ||
                 curr->isDatatype()) {
-                zeroonecount = spacecount;
+              if (curr->Previous && curr->Previous->isOneOf(tok::ellipsis, tok::less))
+                spacecount = 0;
+              else 
                 spacecount = 1;
             }
 
             if (curr->is(tok::identifier)) 
-                zeroonecount = 1;
+                spacecount = 1;
 
             Changes[i].StartOfTokenColumn += MaxSpecifierTabs * Style.TabWidth;
-            Changes[i].Spaces = zeroonecount;
-
-            curr = curr->getNextNonComment();
-            ++i;
-        } while (bracecount == 0);
+            Changes[i].Spaces = spacecount;
+        } while (bracecount != 0);
       }
     }
   }

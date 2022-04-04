@@ -376,6 +376,12 @@ struct FormatToken {
   /// TALLY: R-Paren count
   unsigned RparenCount = 0;
 
+  /// TALLY: L-Paren count
+  unsigned LArrowCount = 0;
+
+  /// TALLY: R-Paren count
+  unsigned RArrowCount = 0;
+
   /// TALLY: A weight to determine whether line break in the original must be enforced
   unsigned OriginalLineBreakWeight = 0;
 

@@ -95,7 +95,7 @@ bool FormatToken::isAfterNoDiscardOrNoReturnOrTemplate(unsigned & newlinescount)
       logicalfirst = this->MyLine->First;
 
     if (logicalfirst) {
-      if (this->Next == logicalfirst->walkTemplateBlockInClassDecl ())
+      if (this->Next == logicalfirst->walkTemplateBlockInClassDecl () && this->Next->is(tok::kw_friend) == false)
         newlinescount = 1;
 
       return logicalfirst->is(tok::kw_template);
