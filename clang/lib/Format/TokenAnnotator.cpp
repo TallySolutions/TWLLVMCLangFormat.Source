@@ -2565,8 +2565,11 @@ void TokenAnnotator::walkLine1(AnnotatedLine& Line) {
                             }
                         }
 
-                        if (MyPrev)
-                            MyPrev->NewlinesBefore = 1;
+                        if (MyPrev) {
+                            if (!(MyPrev->isCtorOrDtor())) {
+                                MyPrev->NewlinesBefore = 1;
+                            }
+                        }
                     }
                 }
             }

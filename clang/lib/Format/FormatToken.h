@@ -647,20 +647,63 @@ struct FormatToken {
   }
 
   // TALLY: Helper function
+  bool isCtorOrDtor() const {
+      const FormatToken * MyPrev = getPreviousNonComment();
+      bool isdtor {};
+
+      if (MyPrev) {
+          isdtor = MyPrev->is(tok::tilde);
+
+          if (!isdtor)
+              return false;
+      }
+
+      if (IsClassScope) {
+          return (ClassScopeName.equals (TokenText));
+      }
+
+      if (isdtor) {
+          if (MyPrev->getPreviousNonComment() && MyPrev->getPreviousNonComment()->getPreviousNonComment()) {
+              StringRef clsnm(MyPrev->getPreviousNonComment()->getPreviousNonComment()->TokenText);
+              bool isEql = clsnm.equals(TokenText);
+
+              return (isEql);
+          }
+
+          return false;
+      }
+
+      if (getNextNonComment() && getNextNonComment()->getNextNonComment()) {
+          StringRef nxtToNextTkn(getNextNonComment()->getNextNonComment()->TokenText);
+          bool isEql = nxtToNextTkn.equals(TokenText);
+
+          return isEql;
+      }
+
+      return false;
+  }
+
+  // TALLY: Helper function
   bool isConstructor() const {
       const FormatToken* MyPrev = getPreviousNonComment();
       if (MyPrev) {
           return false;
       }
 
-      return (ClassScopeName.equals (TokenText));
+      if (IsClassScope) {
+          return (ClassScopeName.equals (TokenText));
+      }
+
+      return false;
   }
 
   // TALLY: Helper function
   bool isDestructor() const {
       const FormatToken* MyNext = getNextNonComment();
       if (is(tok::tilde) && MyNext) {
-          return (MyNext->ClassScopeName.equals (MyNext->TokenText));
+          if (IsClassScope) {
+              return (MyNext->ClassScopeName.equals (MyNext->TokenText));
+          }
       }
 
       return false;
