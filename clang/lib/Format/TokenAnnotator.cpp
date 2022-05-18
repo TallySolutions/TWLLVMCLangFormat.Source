@@ -2424,8 +2424,19 @@ void TokenAnnotator::walkLine1(AnnotatedLine& Line) {
     // TALLY: Walk the line in forward direction
     FormatToken* MyToken = Line.First;
     if (MyToken) {
-        for (MyToken = Line.First; MyToken != nullptr; MyToken = MyToken->Next) {
+        for (; MyToken != nullptr; MyToken = MyToken->Next) {
             // Compute state
+
+            // Populate Set if the line define a MACRO
+            if (MyToken->is(tok::hash) && MyToken->Next) {
+                StringRef defstr(STRDEFINETEXT);
+
+                if (MyToken->Next->TokenText.equals(defstr) && MyToken->Next->Next) {
+                    string val(MyToken->Next->Next->TokenText.data(), MyToken->Next->Next->TokenText.size());
+
+                    DefinedMacros.insert(val);
+                }
+            }
 
             if (MyToken->isOneOf(tok::kw_class, tok::kw_struct, tok::kw_union, tok::kw_enum)) {
                 if (MyToken->is(tok::kw_class)) {
@@ -2619,6 +2630,30 @@ void TokenAnnotator::walkLine1(AnnotatedLine& Line) {
             MyToken->IsInTemplateLine = MyToken->IsInTemplateLine ? true : IsInTemplateLine;
             MyToken->LArrowCount = LArrowCount;
             MyToken->RArrowCount = RArrowCount;
+
+            // Check if this token is a MACRO
+            if ((MyToken->Previous == nullptr && MyToken->is(tok::identifier) && MyToken->Next && MyToken->Next->is(tok::semi))
+                || (MyToken->Previous == nullptr && MyToken->is(tok::identifier) && MyToken->Next && MyToken->Next->is(tok::comment))
+                || (MyToken->Previous == nullptr && MyToken->is(tok::identifier) && MyToken->Next == nullptr)) {
+
+                string val(MyToken->TokenText.data(), MyToken->TokenText.size());
+
+                if (DefinedMacros.find(val) != DefinedMacros.end()) {
+                    MyToken->Finalized = true;
+                }
+                if (MyToken->Next)
+                    MyToken->HasSemiColonInLine = MyToken->Next->is(tok::semi);
+                else
+                    MyToken->HasSemiColonInLine = false;
+            }
+
+            if (MyToken->Previous != nullptr && MyToken->Previous->Finalized && MyToken->is(tok::comment)) {
+                string val(MyToken->Previous->TokenText.data(), MyToken->Previous->TokenText.size());
+
+                if (DefinedMacros.find(val) != DefinedMacros.end()) {
+                    MyToken->Finalized = true;
+                }
+            }
         }
     }
 
@@ -2852,6 +2887,7 @@ void TokenAnnotator::calculateFormattingInformation(AnnotatedLine &Line) {
   while (Current) {
     if (isFunctionDeclarationName(*Current, Line))
       Current->setType(TT_FunctionDeclarationName);
+
     if (Current->is(TT_LineComment)) {
       if (Current->Previous->BlockKind == BK_BracedInit &&
           Current->Previous->opensScope())

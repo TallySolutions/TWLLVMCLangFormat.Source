@@ -1073,6 +1073,10 @@ void WhitespaceManager::columnarizeDeclarationSpecifierTokens() {
             // len=5
             if (MyTok->is(tok::kw_const)) {
                 MyLine->LastSpecifierPadding = 3;
+                if (!PrevTok) {
+                    Changes[i].Spaces += MyLine->LastSpecifierPadding + 1;
+                    Changes[i].StartOfTokenColumn += 4;
+                }
                 MyLine->LastSpecifierTabs += 2;
             }
             // len=6

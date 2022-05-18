@@ -17,6 +17,10 @@
 
 #include "UnwrappedLineParser.h"
 #include "clang/Format/Format.h"
+#include <string>
+#include <set>
+
+using namespace std;
 
 namespace clang {
 class SourceManager;
@@ -176,6 +180,13 @@ public:
   TokenAnnotator(const FormatStyle &Style, const AdditionalKeywords &Keywords)
       : Style(Style), Keywords(Keywords) {}
 
+  /// TALLY: clean the set that is created.
+  ~TokenAnnotator() {
+
+      if (DefinedMacros.size() > 0)
+          DefinedMacros.clear();
+  }
+
   /// Adapts the indent levels of comment lines to the indent of the
   /// subsequent line.
   // FIXME: Can/should this be done in the UnwrappedLineParser?
@@ -268,6 +279,11 @@ private:
   const FormatStyle &Style;
 
   const AdditionalKeywords &Keywords;
+
+  // TALLY: mark MACRO, is populated only when it is defined in same file it is used.
+  static constexpr char STRDEFINETEXT[] {'d','e','f','i','n','e','\0'};
+
+  set<string> DefinedMacros;
 };
 
 } // end namespace format

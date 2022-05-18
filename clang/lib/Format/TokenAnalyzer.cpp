@@ -68,7 +68,6 @@ std::pair<tooling::Replacements, unsigned> TokenAnalyzer::process() {
   IdentifierTable IdentTable(getFormattingLangOpts(Style));
   FormatTokenLexer Lex(Env.getSourceManager(), Env.getFileID(),
                        Env.getFirstStartColumn(), Style, Encoding, Allocator,
-
                        IdentTable);
   ArrayRef<FormatToken *> Toks(Lex.lex());
   SmallVector<FormatToken *, 10> Tokens(Toks.begin(), Toks.end());
