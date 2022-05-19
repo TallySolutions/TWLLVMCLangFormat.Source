@@ -3011,6 +3011,7 @@ void UnwrappedLineParser::distributeComments(
     }
     if (ShouldPushCommentsInCurrentLine) {
       pushToken(FormatTok);
+      addUnwrappedLine();
     } else {
       CommentsBeforeNextToken.push_back(FormatTok);
     }
