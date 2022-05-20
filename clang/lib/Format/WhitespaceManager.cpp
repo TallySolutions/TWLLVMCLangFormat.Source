@@ -1337,14 +1337,18 @@ void WhitespaceManager::columnarizeNoDiscardOrNoReturnOrTemplate() {
 
             if (curr->isOneOf (tok::kw_template, tok::kw_typename, tok::kw_class) ||
                 curr->isDatatype()) {
-              if (curr->Previous && curr->Previous->isOneOf(tok::ellipsis, tok::less))
+              if (curr->Previous && curr->Previous->isOneOf(tok::ellipsis, tok::less, tok::coloncolon))
                 spacecount = 0;
               else 
                 spacecount = 1;
             }
 
-            if (curr->is(tok::identifier)) 
-                spacecount = 1;
+            if (curr->is(tok::identifier)) {
+                if (curr->Previous && curr->Previous->isOneOf(tok::ellipsis, tok::less, tok::coloncolon))
+                    spacecount = 0;
+                else
+                    spacecount = 1;
+            }
 
             Changes[i].StartOfTokenColumn += MaxSpecifierTabs * Style.TabWidth;
             Changes[i].Spaces = spacecount;
