@@ -1381,9 +1381,16 @@ void WhitespaceManager::columnarizeIdentifierTokens() {
         FormatToken* NextTok = MyTok->getNextNonCommentNonConst();
 
         if (MyTok->isMemberVarNameInDecl()) {
+
             size_t lenDiff = MaxDatatypeLen - MyTok->PrevTokenSizeForColumnarization;
             
-            Changes[i].Spaces = pad + lenDiff;
+            if (MyTok->Previous && MyTok->Previous->is(tok::l_brace) && MyTok->Next && MyTok->Next->is(tok::comma)) {
+                Changes[i].Spaces = 0;
+            }
+            else {
+                Changes[i].Spaces = pad + lenDiff;
+            }
+
             int j = i + 1;
 
             while (j < Changes.size() && Changes[j].NewlinesBefore == 0) {
