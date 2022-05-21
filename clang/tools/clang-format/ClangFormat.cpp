@@ -24,6 +24,10 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/Process.h"
 
+/// TALLY
+#include <stack>
+#include <string>
+
 using namespace llvm;
 using clang::tooling::Replacements;
 
@@ -336,6 +340,98 @@ static void outputXML(const Replacements &Replaces,
   outs() << "</replacements>\n";
 }
 
+/// TALLY, A lightweight scan to see if file has correct number of braces '{}, () []'.
+///        Need to add support for template related braces '<>'
+static bool MissingNotBraces(StringRef BufStr) {
+  using namespace std;
+
+  stack<char> braces;
+  const char * data = BufStr.data();
+
+  const char doustr   {'\"'};
+  const char sinstr   {'\''};
+  const char l_curly  {'{'};
+  const char l_square {'['};
+  const char l_angle  {'<'};
+  const char l_curve  {'('};
+  const char r_curly  {'}'};
+  const char r_square {']'};
+  const char r_angle  {'>'};
+  const char r_curve  {')'};
+  bool instr          { false };
+  int idx             {};
+
+  while (data[idx] != '\0') {
+
+    char ch = data[idx];
+
+    // ignore comment line
+    if (ch == '/') {
+
+      ch = data[++idx];
+      if (ch == '/') { // skip till we reach at "\n" or end of string '\0'
+        while (data[++idx] != '\n' && data[idx] != '\0')
+              ;
+
+          continue;
+      }
+      else if (ch == '*') {  // the comment start with /* and so will end with */
+        ++idx;
+        while (data[idx] != '\0') { // this is a comment
+          if (data[idx] == '*' && data[++idx] == '/') {
+              break;
+          }
+          ++idx;
+        }
+        if (data[idx] == '\0')
+            break;
+
+        ++idx;
+        continue;
+      }
+    }    // comment check section end
+
+    // Ignore if braces are part of string
+    if ((ch == doustr || ch == sinstr)) {
+
+      instr = !instr;
+      ++idx;
+      continue;
+    }
+
+    if (instr) {
+
+      ++idx;
+      continue;
+    }
+
+    // template support to be added
+    if ((ch == l_curly || ch == l_square || ch == l_curve)) {
+
+      braces.push(ch);
+    }
+    else if (ch == r_curly || ch == r_square || ch == r_curve) {    // tempalte bracket to be handled.
+
+        char val = braces.top();
+
+        if ((ch == r_curly) && (val == l_curly))
+            braces.pop();
+        else if ((ch == r_square) && (val == l_square))
+            braces.pop();
+        else if ((ch == r_curve) && (val == l_curve))
+            braces.pop();
+        else
+            return false;
+    }
+    ++idx;
+  }
+
+  if (!braces.empty())
+      return false;
+
+  return true;
+}
+
 // Returns true on error.
 static bool format(StringRef FileName) {
   if (!OutputXML && Inplace && FileName == "-") {
@@ -366,6 +462,13 @@ static bool format(StringRef FileName) {
       errs() << " in file '" << FileName << "'";
     errs() << ".\n";
     return true;
+  }
+
+  /// TALLY scan current file for mismatch braces, and return if found.
+  if (!MissingNotBraces(BufStr)) {
+
+      llvm::errs() << "error: file has mismatch braces\n";
+      return false;
   }
 
   std::vector<tooling::Range> Ranges;
