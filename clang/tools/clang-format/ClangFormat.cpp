@@ -340,6 +340,67 @@ static void outputXML(const Replacements &Replaces,
   outs() << "</replacements>\n";
 }
 
+enum class TemplateCheckError {
+
+    NotTemplate,
+    BracesMismatch,
+};
+
+
+/// TALLY, Scan to see if following test is a template declaration.
+static bool IsTemplateReference(const char * Data, int & idx, TemplateCheckError & ErrVal)
+{
+    using namespace std;
+    stack<char> tmplt_braces;
+    int pIdx = idx - 1;
+
+    tmplt_braces.push('<');
+    while (Data[idx] != '\0') {
+
+        if (Data[idx] == ';' || Data[idx] == '{' || Data[idx] == '[' || Data[idx] == '('
+            || Data[idx] == '}' || Data[idx] == ']' || Data[idx] == ')') {
+
+            if (tmplt_braces.size() == 1 && Data[idx] == ';') {
+
+                ++idx;
+                ErrVal = TemplateCheckError::NotTemplate;
+                return false;
+            }
+            else {
+
+                ++idx;
+                ErrVal = TemplateCheckError::BracesMismatch;
+                return false;
+            }
+        }
+        if (Data[idx] == '>') {
+
+            tmplt_braces.pop();
+
+            if (tmplt_braces.size() == 0) {
+
+                ++idx;
+                return true;
+            }
+        }
+        else if (Data[idx] == '<') {
+
+            if (pIdx == idx - 1) {
+                // it is "<<"
+                ++idx;
+                ErrVal = TemplateCheckError::NotTemplate;
+                return false;
+            }
+            tmplt_braces.push(Data[idx]);
+        }
+
+        ++idx;
+    }
+
+    ErrVal = TemplateCheckError::BracesMismatch;
+    return false;
+}
+
 /// TALLY, A lightweight scan to see if file has correct number of braces '{}, () []'.
 ///        Need to add support for template related braces '<>'
 static bool MissingNotBraces(StringRef BufStr) {
@@ -348,7 +409,7 @@ static bool MissingNotBraces(StringRef BufStr) {
   stack<char> braces;
   const char * data = BufStr.data();
 
-  const char doustr   {'\"'};
+  const char doustr   {'"'};
   const char sinstr   {'\''};
   const char l_curly  {'{'};
   const char l_square {'['};
@@ -358,7 +419,10 @@ static bool MissingNotBraces(StringRef BufStr) {
   const char r_square {']'};
   const char r_angle  {'>'};
   const char r_curve  {')'};
-  bool instr          { false };
+  bool instr          {false};    // in string
+  // TODO: quot within string need to be handled
+  //bool isdouble       {false};   //
+  //bool issingle       {false};   //
   int idx             {};
 
   while (data[idx] != '\0') {
@@ -366,7 +430,7 @@ static bool MissingNotBraces(StringRef BufStr) {
     char ch = data[idx];
 
     // ignore comment line
-    if (ch == '/') {
+    if (!instr && ch == '/') {
 
       ch = data[++idx];
       if (ch == '/') { // skip till we reach at "\n" or end of string '\0'
@@ -394,7 +458,22 @@ static bool MissingNotBraces(StringRef BufStr) {
     // Ignore if braces are part of string
     if ((ch == doustr || ch == sinstr)) {
 
-      instr = !instr;
+      //if (ch == doustr) //  && !isdouble && !issingle
+      //    isdouble = !isdouble;
+      //else if (ch == sinstr) //  && !isdouble && !issingle
+      //    issingle = !issingle;
+
+      //if ((isdouble && !issingle || issingle && !isdouble)) {
+          instr = !instr;
+
+          //if (!instr) {
+          //    isdouble = false;
+          //    issingle = false;
+          //}
+      //}
+      //else
+      //    instr = false;
+
       ++idx;
       continue;
     }
@@ -406,11 +485,24 @@ static bool MissingNotBraces(StringRef BufStr) {
     }
 
     // template support to be added
-    if ((ch == l_curly || ch == l_square || ch == l_curve)) {
+    if ((ch == l_curly || ch == l_square || ch == l_curve || ch == l_angle)) {
 
-      braces.push(ch);
+        // if template reference then analyse
+        if (ch == l_angle) {
+            TemplateCheckError ErrVal ;
+
+            if (!IsTemplateReference(data, ++idx, ErrVal)) {
+
+                if (ErrVal == TemplateCheckError::BracesMismatch)
+                    return false;
+            }
+
+            continue;
+        }
+
+        braces.push(ch);
     }
-    else if (ch == r_curly || ch == r_square || ch == r_curve) {    // tempalte bracket to be handled.
+    else if (ch == r_curly || ch == r_square || ch == r_curve || ch == l_angle) {    // tempalte bracket to be handled.
 
         char val = braces.top();
 
