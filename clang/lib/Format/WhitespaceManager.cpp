@@ -98,7 +98,6 @@ const tooling::Replacements& WhitespaceManager::generateReplacements() {
     
     //columnarizePPKeywords();                              // TALLY
     //columnarizePPDefineKeyword();                         // TALLY. We do NOT use alignConsecutiveMacros().
-    
     columnarizeDeclarationSpecifierTokens();              // TALLY
     columnarizeDatatypeTokens();                          // TALLY
     columnarizeNoDiscardOrNoReturnOrTemplate ();          // TALLY
@@ -1073,7 +1072,7 @@ void WhitespaceManager::columnarizeDeclarationSpecifierTokens() {
             // len=5
             if (MyTok->is(tok::kw_const)) {
                 MyLine->LastSpecifierPadding = 3;
-                if (!PrevTok) {
+                if (!PrevTok && (MyLine->MightBeFunctionDecl || MyTok->IsStructScope)) {
                     Changes[i].Spaces += MyLine->LastSpecifierPadding + 1;
                     Changes[i].StartOfTokenColumn += 4;
                 }
