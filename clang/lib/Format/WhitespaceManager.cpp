@@ -1376,7 +1376,7 @@ void WhitespaceManager::columnarizeIdentifierTokens() {
 
         const FormatToken* MyTok = Changes[i].Tok;
 
-        if ((!(MyTok->IsClassScope || MyTok->IsStructScope)) || MyTok->LbraceCount == 0 || MyTok->LparenCount > 0)
+        if ((!(MyTok->IsClassScope || MyTok->IsStructScope)) && (MyTok->LbraceCount == 0 || MyTok->LparenCount > 0))
             continue;
 
         // Dont align bitfield specifiers.
@@ -1443,6 +1443,14 @@ void WhitespaceManager::columnarizeIdentifierTokens() {
                     NextNextTok->PrevTokenSizeForColumnarization = tokSize;
             }
         }
+        else if (MyTok->is(tok::l_brace) && MyTok->Previous
+                && MyTok->Previous->is(tok::identifier)
+                && MyTok->Previous->Previous
+                && MyTok->Previous->Previous->is(tok::star)) {
+            // populate MaxGlobalVarNameLen
+            if (MaxGlobalVarNameLen < MyTok->Previous->ColumnWidth)
+                MaxGlobalVarNameLen = MyTok->Previous->ColumnWidth;
+        }
     }
 }
 
@@ -1466,7 +1474,7 @@ void WhitespaceManager::columnarizeLParenTokensAndSplitArgs() {
 
         const FormatToken* MyTok = Changes[i].Tok;
 
-        if ((!(MyTok->IsClassScope || MyTok->IsStructScope)) || MyTok->LbraceCount == 0)
+        if ((!(MyTok->IsClassScope || MyTok->IsStructScope)) && MyTok->LbraceCount == 0)
             continue;
 
         FormatToken* PrevTok = MyTok->getPreviousNonComment();
@@ -1476,6 +1484,12 @@ void WhitespaceManager::columnarizeLParenTokensAndSplitArgs() {
             Changes[i].Spaces = pad + lenDiff;
             newlineargssize = toPad + MaxSpecifierTabs * Style.TabWidth + MaxDatatypeLen + pad + 2;
             insideargs = true;
+        }
+        else if (MyTok->is(tok::l_brace) && PrevTok && PrevTok->is(tok::identifier)
+                && MyTok->Previous->Previous && MyTok->Previous->Previous->is(tok::star)) {
+            size_t lenDiff = MaxGlobalVarNameLen - PrevTok->ColumnWidth;
+            Changes[i].Spaces = 1 + lenDiff;
+            insideargs = false;
         }
 
         if (insideargs && MyTok->is(tok::r_paren))

@@ -278,6 +278,7 @@ private:
   size_t MaxSpecifierTabs = 0;
   size_t MaxDatatypeLen = 0;
   size_t MaxMemberNameLen = 0;
+  size_t MaxGlobalVarNameLen = 0;
 };
 
 } // namespace format
