@@ -946,6 +946,12 @@ struct FormatToken {
               if (MyPrev->isDatatype()) {
                   prevOk = true;
               }
+              else if (MyPrev && (MyPrev->isDatatype() || MyPrev->isPointerOrRef())) {
+                  prevOk = true;
+              }
+              else if (MyPrev && (MyPrev->is(tok::coloncolon)) && MyPrev->Previous && MyPrev->Previous->is(tok::identifier)) {
+                  prevOk = true;
+              }
               else if (MyPrev->IsInterimBeforeName) {
                   while (MyPrev && MyPrev->IsInterimBeforeName)
                       MyPrev = MyPrev->getPreviousNonComment();

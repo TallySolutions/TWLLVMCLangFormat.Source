@@ -560,9 +560,11 @@ AlignTokenSequence(unsigned Start, unsigned End, unsigned Column, F&& Matches,
 
         if (!FoundMatchOnLine && (IgnoreScope || !InsideNestedScope) &&
             Matches(Changes[i])) {
-            FoundMatchOnLine = true;
-            Shift = Column - Changes[i].StartOfTokenColumn;
-            Changes[i].Spaces += Shift;
+            if (!(Changes[i].Tok->is(tok::identifier) && (i > 0) && Changes[i-1].Tok->is(tok::coloncolon))) {
+                FoundMatchOnLine = true;
+                Shift = Column - Changes[i].StartOfTokenColumn;
+                Changes[i].Spaces += Shift;
+            }
         }
 
 
