@@ -964,16 +964,16 @@ struct FormatToken {
           }
           const FormatToken* MyNext = getNextNonComment();
           if (MyNext) {
-              if (MyNext->isOneOf(tok::equal, tok::semi, tok::l_square, tok::comma)) {
+              if (MyNext->isOneOf(tok::equal, tok::semi, tok::l_square, tok::comma, tok::r_paren)) {
                   nextOk = true;
               }
-              if (!IsClassScope && MyNext->is(tok::l_paren) && MyNext->MatchingParen) {
+              else if (!IsClassScope && MyNext->is(tok::l_paren) && MyNext->MatchingParen) {
                   nextOk = true;
               }
-              if (MyNext->is(tok::l_brace) && MyNext->MatchingParen) {
+              else if (MyNext->is(tok::l_brace) && MyNext->MatchingParen) {
                   nextOk = true;
               }
-              if (MyNext->is(tok::colon)) {
+              else if (MyNext->is(tok::colon)) {
                   const FormatToken* MyNext2 = MyNext->getNextNonComment();
                   if (MyNext2 && MyNext2->is(tok::numeric_constant)) {
                       nextOk = true;

@@ -560,7 +560,8 @@ AlignTokenSequence(unsigned Start, unsigned End, unsigned Column, F&& Matches,
 
         if (!FoundMatchOnLine && (IgnoreScope || !InsideNestedScope) &&
             Matches(Changes[i])) {
-            if (!(Changes[i].Tok->is(tok::identifier) && (i > 0) && Changes[i-1].Tok->is(tok::coloncolon))) {
+            if (!(Changes[i].Tok->is(tok::identifier) && (i > 0) && Changes[i-1].Tok->is(tok::coloncolon))
+                && Changes[i].Tok->LparenCount == 0) {
                 FoundMatchOnLine = true;
                 Shift = Column - Changes[i].StartOfTokenColumn;
                 Changes[i].Spaces += Shift;
@@ -1345,7 +1346,7 @@ void WhitespaceManager::columnarizeNoDiscardOrNoReturnOrTemplate() {
             }
 
             if (curr->is(tok::identifier)) {
-                if (curr->Previous && curr->Previous->isOneOf(tok::ellipsis, tok::less, tok::coloncolon))
+                if (curr->Previous && curr->Previous->isOneOf(tok::less, tok::coloncolon)) // tok::ellipsis,
                     spacecount = 0;
                 else
                     spacecount = 1;

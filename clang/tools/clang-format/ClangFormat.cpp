@@ -502,7 +502,9 @@ static bool MissingNotBraces(StringRef BufStr) {
 
         braces.push(ch);
     }
-    else if (ch == r_curly || ch == r_square || ch == r_curve || ch == l_angle) {    // tempalte bracket to be handled.
+    else if (ch == r_curly || ch == r_square || ch == r_curve) {    // tempalte bracket to be handled.
+        if (braces.empty())
+            return false;
 
         char val = braces.top();
 
