@@ -2852,7 +2852,9 @@ void TokenAnnotator::calculateFormattingInformation(AnnotatedLine &Line) {
     // TALLY: Walk the line in forward direction
     FormatToken* MyToken = Line.First;
     bool IsDoubleIndentNeeded = false;
-    if (MyToken) {
+    bool IsReturnLine = MyToken->is(tok::kw_return);
+
+    if (MyToken && !IsReturnLine) {
         for (MyToken = Line.First; MyToken != nullptr && IsDoubleIndentNeeded == false; MyToken = MyToken->Next) {
             if (MyToken->IsVariableNameWithDatatype ||
                 MyToken->isTallyTrace())
