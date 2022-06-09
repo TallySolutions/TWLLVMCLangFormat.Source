@@ -145,6 +145,10 @@ const tooling::Replacements &WhitespaceManager::generateReplacements() {
 void WhitespaceManager::calculateLineBreakInformation() {
   Changes[0].PreviousEndOfTokenColumn = 0;
   Change *LastOutsideTokenChange = &Changes[0];
+  int PrevIdentifierTknStartOfTokenCntValue {};
+  int PrevIdentifierTknSpacesValue {};
+  int FirstCommnetWhiteSpaces {};
+
   for (unsigned i = 1, e = Changes.size(); i != e; ++i) {
     SourceLocation OriginalWhitespaceStart =
         Changes[i].OriginalWhitespaceRange.getBegin();
@@ -250,6 +254,20 @@ void WhitespaceManager::calculateLineBreakInformation() {
     // Reset the IsTrailingComment flag for changes inside of trailing comments
     // so they don't get realigned later. Comment line breaks however still need
     // to be aligned.
+    if (Change.Tok->Previous && Change.Tok->Previous->is(tok::l_brace)
+            && Change.Tok->is(tok::identifier)) {
+        PrevIdentifierTknStartOfTokenCntValue = Change.StartOfTokenColumn;
+        PrevIdentifierTknSpacesValue = Change.Spaces;
+    }
+    else if (PrevIdentifierTknStartOfTokenCntValue && Change.Spaces == 0
+          && Change.Tok->is(tok::identifier) && !Change.Tok->Previous
+          && Change.Tok->Next && Change.Tok->Next->is(tok::comma)
+          && Change.Tok->LbraceCount && Change.Tok->IsVariableNameWithoutDatatype
+          && Change.Tok->NewlinesBefore) {
+        Change.Spaces = PrevIdentifierTknSpacesValue;
+        Change.StartOfTokenColumn = PrevIdentifierTknStartOfTokenCntValue;
+    }
+
     if (Change.IsInsideToken && Change.NewlinesBefore == 0)
       Change.IsTrailingComment = false;
     Change.StartOfBlockComment = nullptr;
@@ -258,11 +276,19 @@ void WhitespaceManager::calculateLineBreakInformation() {
       if (Change.Tok->is(TT_LineComment) || !Change.IsInsideToken)
         LastBlockComment = &Change;
       else {
-        if ((Change.StartOfBlockComment = LastBlockComment))
+        if ((Change.StartOfBlockComment == LastBlockComment))
           Change.IndentationOffset =
               Change.StartOfTokenColumn -
               Change.StartOfBlockComment->StartOfTokenColumn;
       }
+
+      if (FirstCommnetWhiteSpaces == 0) {
+          FirstCommnetWhiteSpaces = Change.Spaces;
+      }
+      else {
+          Change.Spaces -= PrevIdentifierTknSpacesValue;
+      }
+
     } else {
       LastBlockComment = nullptr;
     }
