@@ -114,7 +114,7 @@ const tooling::Replacements& WhitespaceManager::generateReplacements() {
     alignConsecutiveAssignementsOnUsing ();               // TALLY
 
     alignChainedConditionals();
-    alignTrailingComments();;
+    alignTrailingComments();
     alignEscapedNewlines();
 
     generateChanges();
@@ -264,7 +264,7 @@ void WhitespaceManager::calculateLineBreakInformation() {
           && Change.Tok->is(tok::identifier) && !Change.Tok->Previous
           && Change.Tok->Next && Change.Tok->Next->is(tok::comma)
           && Change.Tok->LbraceCount && Change.Tok->IsVariableNameWithoutDatatype
-          && Change.Tok->NewlinesBefore) {
+          && Change.Tok->NewlinesBefore && Change.Tok->LparenCount == 0) {
         Change.Spaces = PrevIdentifierTknSpacesValue;
         Change.StartOfTokenColumn = PrevIdentifierTknStartOfTokenCntValue;
     }
@@ -283,10 +283,10 @@ void WhitespaceManager::calculateLineBreakInformation() {
               Change.StartOfBlockComment->StartOfTokenColumn;
       }
 
-      if (FirstCommnetWhiteSpaces == 0) {
+      if (FirstCommnetWhiteSpaces == 0 && Change.Spaces && Change.Tok->LbraceCount) {
           FirstCommnetWhiteSpaces = Change.Spaces;
       }
-      else {
+      else if (Change.Spaces && Change.Tok->LbraceCount && PrevIdentifierTknSpacesValue) {
           if (Change.Tok->Previous && !Change.Tok->Previous->is(tok::comment))
               Change.Spaces -= PrevIdentifierTknSpacesValue;
       }
@@ -1275,6 +1275,19 @@ void WhitespaceManager::columnarizeNoDiscardOrNoReturnOrTemplate() {
   for (int i = 0; i < Changes.size(); ++i) {
 
     const FormatToken *MyTok = Changes[i].Tok;
+
+    // Space before [[maybe_unused]]
+    if (MyTok->is(tok::l_square) && MyTok->Next && MyTok->Next->is(tok::l_square)
+        && MyTok->LparenCount
+        && (!MyTok->Previous || (MyTok->Previous && MyTok->Previous->is(tok::comment)))) {
+      Changes[i].Spaces = 1;
+    } // arrangement like LocatorType & pLocation
+    else if (MyTok->is(tok::identifier) && MyTok->Previous
+        && MyTok->Previous->isOneOf(tok::amp, tok::ampamp, tok::star)
+        && MyTok->Previous->Previous && MyTok->Previous->Previous->is(tok::identifier)
+        && MyTok->LparenCount) {
+      Changes[i].Spaces = 1;
+    }
 
     if ((!(MyTok->IsClassScope || MyTok->IsStructScope)) || MyTok->LbraceCount == 0 || MyTok->LparenCount > 0)
       continue;

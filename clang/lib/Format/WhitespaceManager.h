@@ -122,12 +122,12 @@ public:
     // Changes might be in the middle of a token, so we cannot just keep the
     // FormatToken around to query its information.
     SourceRange OriginalWhitespaceRange;
-    unsigned StartOfTokenColumn;
-    unsigned NewlinesBefore;
+    unsigned StartOfTokenColumn{};
+    unsigned NewlinesBefore{};
     std::string PreviousLinePostfix;
     std::string CurrentLinePrefix;
-    bool IsAligned;
-    bool ContinuesPPDirective;
+    bool IsAligned{};
+    bool ContinuesPPDirective{};
 
     // The number of spaces in front of the token or broken part of the token.
     // This will be adapted when aligning tokens.
