@@ -145,9 +145,6 @@ const tooling::Replacements &WhitespaceManager::generateReplacements() {
 void WhitespaceManager::calculateLineBreakInformation() {
   Changes[0].PreviousEndOfTokenColumn = 0;
   Change *LastOutsideTokenChange = &Changes[0];
-  int PrevIdentifierTknStartOfTokenCntValue {};
-  int PrevIdentifierTknSpacesValue {};
-  int FirstCommnetWhiteSpaces {};
 
   for (unsigned i = 1, e = Changes.size(); i != e; ++i) {
     SourceLocation OriginalWhitespaceStart =
@@ -250,6 +247,10 @@ void WhitespaceManager::calculateLineBreakInformation() {
   Changes.back().IsTrailingComment = Changes.back().Tok->is(tok::comment);
 
   const WhitespaceManager::Change *LastBlockComment = nullptr;
+  int PrevIdentifierTknStartOfTokenCntValue {};
+  int PrevIdentifierTknSpacesValue {};
+  int FirstCommnetWhiteSpaces {};
+
   for (auto &Change : Changes) {
     // Reset the IsTrailingComment flag for changes inside of trailing comments
     // so they don't get realigned later. Comment line breaks however still need
@@ -286,13 +287,16 @@ void WhitespaceManager::calculateLineBreakInformation() {
           FirstCommnetWhiteSpaces = Change.Spaces;
       }
       else {
-          Change.Spaces -= PrevIdentifierTknSpacesValue;
+          if (Change.Tok->Previous && !Change.Tok->Previous->is(tok::comment))
+              Change.Spaces -= PrevIdentifierTknSpacesValue;
       }
-
     } else {
       LastBlockComment = nullptr;
     }
   }
+  PrevIdentifierTknStartOfTokenCntValue = {};
+  PrevIdentifierTknSpacesValue = {};
+  FirstCommnetWhiteSpaces = {};
 
   // Compute conditional nesting level
   // Level is increased for each conditional, unless this conditional continues
