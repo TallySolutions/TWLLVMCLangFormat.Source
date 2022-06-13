@@ -1447,7 +1447,7 @@ void WhitespaceManager::columnarizeIdentifierTokens() {
                 ++j;
             }
         }
-        else if (MyTok->isFunctionNameAndPrevIsPointerOrRefOrDatatype()) {
+        else if (MyTok->isFunctionNameAndPrevIsPointerOrRefOrDatatype() && !MyTok->IsInFunctionDefinitionScope) {
             size_t lenDiff = MaxDatatypeLen - MyTok->PrevTokenSizeForColumnarization;
             Changes[i].Spaces = pad + lenDiff;
             int j = i + 1;
@@ -1523,7 +1523,7 @@ void WhitespaceManager::columnarizeLParenTokensAndSplitArgs() {
 
         FormatToken* PrevTok = MyTok->getPreviousNonComment();
 
-        if (MyTok->is(tok::l_paren) && PrevTok && PrevTok->isFunctionOrCtorOrPrevIsDtor()) {
+        if (MyTok->is(tok::l_paren) && !MyTok->IsInFunctionDefinitionScope && PrevTok && PrevTok->isFunctionOrCtorOrPrevIsDtor()) {
             size_t lenDiff = MaxMemberNameLen - MyTok->PrevTokenSizeForColumnarization;
             Changes[i].Spaces = pad + lenDiff;
             newlineargssize = toPad + MaxSpecifierTabs * Style.TabWidth + MaxDatatypeLen + pad + 2;
