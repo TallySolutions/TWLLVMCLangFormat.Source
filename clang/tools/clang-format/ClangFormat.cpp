@@ -421,8 +421,8 @@ static bool MissingNotBraces(StringRef BufStr) {
   const char r_curve  {')'};
   bool instr          {false};    // in string
   // TODO: quot within string need to be handled
-  //bool isdouble       {false};   //
-  //bool issingle       {false};   //
+  int dblstrcnt       {};   //
+  int sglstrcnt       {};   //
   int idx             {};
 
   while (data[idx] != '\0') {
@@ -458,22 +458,31 @@ static bool MissingNotBraces(StringRef BufStr) {
     // Ignore if braces are part of string
     if ((ch == doustr || ch == sinstr)) {
 
-      //if (ch == doustr) //  && !isdouble && !issingle
-      //    isdouble = !isdouble;
-      //else if (ch == sinstr) //  && !isdouble && !issingle
-      //    issingle = !issingle;
+      if (ch == doustr) {
+          if (!dblstrcnt) {
+              if (!sglstrcnt) {
+                ++dblstrcnt;
+                instr = !instr;
+              }
+          }
+          else {
+            --dblstrcnt;
+            instr = !instr;
+          }
 
-      //if ((isdouble && !issingle || issingle && !isdouble)) {
-          instr = !instr;
-
-          //if (!instr) {
-          //    isdouble = false;
-          //    issingle = false;
-          //}
-      //}
-      //else
-      //    instr = false;
-
+      }
+      else if (ch == sinstr) {
+          if (!dblstrcnt) {
+              if (!sglstrcnt) {
+                ++sglstrcnt;
+                instr = !instr;
+              }
+              else {
+                --sglstrcnt;
+                instr = !instr;
+              }
+          }
+      }
       ++idx;
       continue;
     }
