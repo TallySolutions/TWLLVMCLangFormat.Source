@@ -494,20 +494,20 @@ static bool MissingNotBraces(StringRef BufStr) {
     }
 
     // template support to be added
-    if ((ch == l_curly || ch == l_square || ch == l_curve || ch == l_angle)) {
+    if ((ch == l_curly || ch == l_square || ch == l_curve)) { //  TODO: || ch == l_angle
 
-        // if template reference then analyse
-        if (ch == l_angle) {
-            TemplateCheckError ErrVal ;
+        // TODO: if template reference then analyse
+        //if (ch == l_angle) {
+        //    TemplateCheckError ErrVal ;
 
-            if (!IsTemplateReference(data, ++idx, ErrVal)) {
+        //    if (!IsTemplateReference(data, ++idx, ErrVal)) {
 
-                if (ErrVal == TemplateCheckError::BracesMismatch)
-                    return false;
-            }
+        //        if (ErrVal == TemplateCheckError::BracesMismatch)
+        //            return false;
+        //    }
 
-            continue;
-        }
+        //    continue;
+        //}
 
         braces.push(ch);
     }
