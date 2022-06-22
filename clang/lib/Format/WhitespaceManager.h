@@ -217,6 +217,9 @@ private:
   /// TALLY: Columnarize specific tokens over all \c Changes.
   void columnarizePPDefineKeyword();
   
+  /// TALLY: Columnarize keywords all \c Changes.
+  void columnarizeKeywords();
+
   /// TALLY: Columnarize specific tokens over all \c Changes.
   void columnarizeDeclarationSpecifierTokens();
 

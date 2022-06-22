@@ -95,7 +95,7 @@ const tooling::Replacements& WhitespaceManager::generateReplacements() {
     llvm::sort(Changes, Change::IsBeforeInFile(SourceMgr));;
     calculateLineBreakInformation();
 
-    
+    columnarizeKeywords();                                // TALLY
     //columnarizePPKeywords();                              // TALLY
     //columnarizePPDefineKeyword();                         // TALLY. We do NOT use alignConsecutiveMacros().
     columnarizeDeclarationSpecifierTokens();              // TALLY
@@ -1041,6 +1041,36 @@ void WhitespaceManager::columnarizePPDefineKeyword() {
     }
 }
 
+// TALLY: Columnarize keywords tokens over all \c Changes.
+void WhitespaceManager::columnarizeKeywords()
+{
+    int spacebefswitch {};
+
+    if (!Style.AlignConsecutiveDeclarations)
+        return;
+
+    for (int i = 0; i < Changes.size(); ++i) {
+
+        const FormatToken* MyTok = Changes[i].Tok;
+
+        if (MyTok->IsInFunctionDefinitionScope) {
+
+            if (MyTok->is(tok::kw_switch)) {
+
+                spacebefswitch = Changes[i].Spaces;
+                continue;
+            }
+
+            if (MyTok->is(tok::kw_case)) {
+
+                Changes[i].Spaces = spacebefswitch + 4;
+                Changes[i].StartOfTokenColumn = spacebefswitch + 4;
+                continue;
+            }
+        }
+    }
+}
+
 /// TALLY: Columnarize specific tokens over all \c Changes.
 // TODO: Check 'template' use-cases and adapt
 // TODO: Works only if declaration specifiers and datatypes do not have inline comments between the tokens.
@@ -1129,6 +1159,10 @@ void WhitespaceManager::columnarizeDeclarationSpecifierTokens() {
             // len=9
             else if (MyTok->is(tok::kw_constexpr)) {
                 MyLine->LastSpecifierPadding = 3;
+                if (!PrevTok && (MyLine->MightBeFunctionDecl || MyTok->IsStructScope)) {
+                    Changes[i].Spaces += MyLine->LastSpecifierPadding + 1;
+                    Changes[i].StartOfTokenColumn += 4;
+                }
                 MyLine->LastSpecifierTabs += 3;
             }
             // len=12
@@ -1433,7 +1467,7 @@ void WhitespaceManager::columnarizeIdentifierTokens() {
 
             size_t lenDiff = MaxDatatypeLen - MyTok->PrevTokenSizeForColumnarization;
             
-            if (MyTok->Previous && MyTok->Previous->is(tok::l_brace) && MyTok->Next && MyTok->Next->is(tok::comma)) {
+            if (MyTok->Previous && MyTok->Previous->is(tok::l_brace) && MyTok->Next && !MyTok->Next->is(tok::comment)) {
                 Changes[i].Spaces = 0;
             }
             else {
