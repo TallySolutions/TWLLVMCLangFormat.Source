@@ -1133,6 +1133,9 @@ unsigned UnwrappedLineFormatter::format(
     const AnnotatedLine &TheLine = *Line;
     unsigned Indent = IndentTracker.getIndent();
 
+    if (Indent && formatGlobalStaticVariableDefinitions(Line))
+      Indent = 0;
+
     // We continue formatting unchanged lines to adjust their indent, e.g. if a
     // scope was added. However, we need to carefully stop doing this when we
     // exit the scope of affected lines to prevent indenting a the entire
@@ -1237,6 +1240,22 @@ unsigned UnwrappedLineFormatter::format(
   }
   PenaltyCache[CacheKey] = Penalty;
   return Penalty;
+}
+
+bool UnwrappedLineFormatter::formatGlobalStaticVariableDefinitions(const AnnotatedLine * Line) {
+    if (Line && Line->First) {
+        FormatToken * tk = Line->First;
+
+        if (!tk->IsClassScope && !tk->IsStructScope && !tk->IsEnumScope
+            && !tk->IsUnionScope && !tk->IsFunctionName && !tk->IsFunctionDefinitionLine
+            && !tk->Previous && tk->Next && !tk->LbraceCount && !tk->LparenCount
+            && tk->HasSemiColonInLine
+            && !tk->isOneOf(tok::r_brace, tok::hash)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 void UnwrappedLineFormatter::formatFirstToken(

@@ -43,6 +43,9 @@ public:
                   unsigned NextStartColumn = 0, unsigned LastStartColumn = 0);
 
 private:
+  // Format global/static variable definitions, return indent
+  bool formatGlobalStaticVariableDefinitions(const AnnotatedLine * Line);
+
   /// Add a new line and the required indent before the first Token
   /// of the \c UnwrappedLine if there was no structural parsing error.
   void formatFirstToken(const AnnotatedLine &Line,

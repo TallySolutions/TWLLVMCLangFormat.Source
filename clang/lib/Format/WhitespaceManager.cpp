@@ -263,7 +263,7 @@ void WhitespaceManager::calculateLineBreakInformation() {
     else if (PrevIdentifierTknStartOfTokenCntValue && Change.Spaces == 0
           && Change.Tok->is(tok::identifier) && !Change.Tok->Previous
           && Change.Tok->Next && Change.Tok->Next->is(tok::comma)
-          && Change.Tok->LbraceCount && Change.Tok->IsVariableNameWithoutDatatype
+          && Change.Tok->LbraceCount //&& Change.Tok->IsVariableNameWithoutDatatype
           && Change.Tok->NewlinesBefore && Change.Tok->LparenCount == 0) {
         Change.Spaces = PrevIdentifierTknSpacesValue;
         Change.StartOfTokenColumn = PrevIdentifierTknStartOfTokenCntValue;
