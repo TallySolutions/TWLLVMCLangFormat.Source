@@ -246,7 +246,7 @@ void WhitespaceManager::calculateLineBreakInformation() {
   Changes.back().TokenLength = 0;
   Changes.back().IsTrailingComment = Changes.back().Tok->is(tok::comment);
 
-  const WhitespaceManager::Change *LastBlockComment = nullptr;
+  WhitespaceManager::Change *LastBlockComment = nullptr;
   int PrevIdentifierTknStartOfTokenCntValue {};
   int PrevIdentifierTknSpacesValue {};
   int FirstCommnetWhiteSpaces {};
@@ -256,7 +256,9 @@ void WhitespaceManager::calculateLineBreakInformation() {
     // so they don't get realigned later. Comment line breaks however still need
     // to be aligned.
     if (Change.Tok->Previous && Change.Tok->Previous->is(tok::l_brace)
-            && Change.Tok->is(tok::identifier)) {
+            && Change.Tok->is(tok::identifier)
+            && !(Change.Tok->IsClassScope || Change.Tok->IsStructScope
+                || Change.Tok->IsEnumScope || Change.Tok->IsUnionScope)) {
         PrevIdentifierTknStartOfTokenCntValue = Change.StartOfTokenColumn;
         PrevIdentifierTknSpacesValue = Change.Spaces;
     }
@@ -274,8 +276,22 @@ void WhitespaceManager::calculateLineBreakInformation() {
     Change.StartOfBlockComment = nullptr;
     Change.IndentationOffset = 0;
     if (Change.Tok->is(tok::comment)) {
-      if (Change.Tok->is(TT_LineComment) || !Change.IsInsideToken)
+      if (Change.Tok->is(TT_LineComment) || !Change.IsInsideToken) {
+        // TALLY: Below changes take care of space before those comments that are
+        // after statement.
+        if (LastBlockComment && LastBlockComment->Tok->is(tok::comment)
+            && Change.Tok->NewlinesBefore == 1 && Change.Spaces > 0
+            && Change.StartOfTokenColumn != LastBlockComment->Tok->OriginalColumn) {
+
+          if (LastBlockComment->Spaces >= 8)
+              LastBlockComment->Spaces = (LastBlockComment->Spaces / 2) - 8;
+
+          Change.Spaces = LastBlockComment->Tok->OriginalColumn + LastBlockComment->Spaces + 4;
+          Change.NewlinesBefore = Change.Tok->NewlinesBefore;
+          Change.StartOfTokenColumn = LastBlockComment->Tok->OriginalColumn;
+        }
         LastBlockComment = &Change;
+      }
       else {
         if ((Change.StartOfBlockComment == LastBlockComment))
           Change.IndentationOffset =
