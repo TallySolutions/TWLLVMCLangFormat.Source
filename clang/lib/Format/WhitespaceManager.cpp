@@ -606,7 +606,8 @@ AlignTokenSequence(unsigned Start, unsigned End, unsigned Column, F&& Matches,
 
         if (!FoundMatchOnLine && (IgnoreScope || !InsideNestedScope) &&
             Matches(Changes[i])) {
-            if (!(Changes[i].Tok->is(tok::identifier) && (i > 0) && Changes[i-1].Tok->is(tok::coloncolon))
+            if (!(Changes[i].Tok->is(tok::identifier) && (i > 0)
+                && Changes[i-1].Tok->isOneOf(tok::coloncolon, tok::l_square, tok::less))
                 && Changes[i].Tok->LparenCount == 0) {
                 FoundMatchOnLine = true;
                 Shift = Column - Changes[i].StartOfTokenColumn;
