@@ -424,6 +424,7 @@ static bool MissingNotBraces(StringRef BufStr) {
   int dblstrcnt       {};   //
   int sglstrcnt       {};   //
   int idx             {};
+  int pidx {};
 
   while (data[idx] != '\0') {
 
@@ -472,6 +473,14 @@ static bool MissingNotBraces(StringRef BufStr) {
 
       }
       else if (ch == sinstr) {
+          // check for numbers/digit are formatted using single quote
+          pidx = idx - 1;
+          if (pidx && (data[pidx] >= '0' && data[pidx] <= '9')
+                        || ((data[pidx] >= 'A' || data[pidx] >= 'a') && (data[pidx] <= 'F' || data[pidx] >= 'f'))) {
+              ++idx;
+              continue;
+          }
+
           if (!dblstrcnt) {
               if (!sglstrcnt) {
                 ++sglstrcnt;
