@@ -265,7 +265,7 @@ void WhitespaceManager::calculateLineBreakInformation() {
     else if (PrevIdentifierTknStartOfTokenCntValue && Change.Spaces == 0
           && Change.Tok->is(tok::identifier) && !Change.Tok->Previous
           && Change.Tok->Next && Change.Tok->Next->is(tok::comma)
-          && Change.Tok->LbraceCount //&& Change.Tok->IsVariableNameWithoutDatatype
+          && Change.Tok->LbraceCount
           && Change.Tok->NewlinesBefore && Change.Tok->LparenCount == 0) {
         Change.Spaces = PrevIdentifierTknSpacesValue;
         Change.StartOfTokenColumn = PrevIdentifierTknStartOfTokenCntValue;
@@ -276,22 +276,8 @@ void WhitespaceManager::calculateLineBreakInformation() {
     Change.StartOfBlockComment = nullptr;
     Change.IndentationOffset = 0;
     if (Change.Tok->is(tok::comment)) {
-      if (Change.Tok->is(TT_LineComment) || !Change.IsInsideToken) {
-        // TALLY: Below changes take care of space before those comments that are
-        // after statement.
-        if (LastBlockComment && LastBlockComment->Tok->is(tok::comment)
-            && Change.Tok->NewlinesBefore == 1 && Change.Spaces > 0
-            && Change.StartOfTokenColumn != LastBlockComment->Tok->OriginalColumn) {
-
-          if (LastBlockComment->Spaces >= 8)
-              LastBlockComment->Spaces = (LastBlockComment->Spaces / 2) - 8;
-
-          Change.Spaces = LastBlockComment->Tok->OriginalColumn + LastBlockComment->Spaces + 4;
-          Change.NewlinesBefore = Change.Tok->NewlinesBefore;
-          Change.StartOfTokenColumn = LastBlockComment->Tok->OriginalColumn;
-        }
-        LastBlockComment = &Change;
-      }
+      if (Change.Tok->is(TT_LineComment) || !Change.IsInsideToken)
+          LastBlockComment = &Change;
       else {
         if ((Change.StartOfBlockComment == LastBlockComment))
           Change.IndentationOffset =
