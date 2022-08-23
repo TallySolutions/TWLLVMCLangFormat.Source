@@ -481,6 +481,11 @@ static bool MissingNotBraces(StringRef BufStr) {
               continue;
           }
 
+          if (data[idx + 1] == '\\' && data[idx + 2] == '0' && data[idx + 3] == sinstr) {
+              idx += 4;
+              continue;
+          }
+
           if (!dblstrcnt) {
               if (!sglstrcnt) {
                 ++sglstrcnt;
