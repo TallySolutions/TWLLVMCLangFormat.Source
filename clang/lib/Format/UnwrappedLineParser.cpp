@@ -1999,8 +1999,9 @@ void UnwrappedLineParser::parseIfThenElse() {
   }
   if (FormatTok->Tok.is(tok::kw_else)) {
     // TALLY: Never have a blank line before an else block
-    if (FormatTok->NewlinesBefore > 1) {
-      FormatTok->NewlinesBefore = 1;
+    if (FormatTok->NewlinesBefore >= 1) {
+      FormatTok->NewlinesBefore = 0;
+      FormatTok->HasUnescapedNewline = false;
     }
     nextToken();
     // handle [[likely]] / [[unlikely]]
