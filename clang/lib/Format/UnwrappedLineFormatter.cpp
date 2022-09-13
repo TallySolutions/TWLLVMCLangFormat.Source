@@ -1388,7 +1388,8 @@ void UnwrappedLineFormatter::formatFirstToken(
   } else if (Line.First->Tok.is(tok::identifier) && Line.Last->Tok.is(tok::comment)
       && Line.First->NewlinesBefore && Line.First->LbraceCount && Line.First->Previous == nullptr) {
 
-    Indent += Style.IndentWidth;
+    if (!Indent && !Line.First->IsInFunctionDefinitionScope)
+        Indent += Style.IndentWidth;
   }
 
   // Preprocessor directives get indented before the hash only if specified
