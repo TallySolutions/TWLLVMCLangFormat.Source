@@ -413,11 +413,9 @@ static bool MissingNotBraces(StringRef BufStr) {
   const char sinstr   {'\''};
   const char l_curly  {'{'};
   const char l_square {'['};
-  const char l_angle  {'<'};
   const char l_curve  {'('};
   const char r_curly  {'}'};
   const char r_square {']'};
-  const char r_angle  {'>'};
   const char r_curve  {')'};
   bool instr          {false};    // in string
   // TODO: quot within string need to be handled
@@ -443,7 +441,8 @@ static bool MissingNotBraces(StringRef BufStr) {
       else if (ch == '*') {  // the comment start with /* and so will end with */
         ++idx;
         while (data[idx] != '\0') { // this is a comment
-          if (data[idx] == '*' && data[++idx] == '/') {
+          if (data[idx] == '*' && data[idx + 1] == '/') {
+              ++idx;
               break;
           }
           ++idx;
@@ -457,7 +456,7 @@ static bool MissingNotBraces(StringRef BufStr) {
     }    // comment check section end
 
     // Ignore if braces are part of string
-    if ((ch == doustr || ch == sinstr)) {
+    if ((ch == doustr /*|| ch == sinstr*/)) {
 
       if (ch == doustr) {
           if (!dblstrcnt) {
@@ -472,31 +471,31 @@ static bool MissingNotBraces(StringRef BufStr) {
           }
 
       }
-      else if (ch == sinstr) {
-          // check for numbers/digit are formatted using single quote
-          pidx = idx - 1;
-          if (pidx && (data[pidx] >= '0' && data[pidx] <= '9')
-                        || ((data[pidx] >= 'A' || data[pidx] >= 'a') && (data[pidx] <= 'F' || data[pidx] >= 'f'))) {
-              ++idx;
-              continue;
-          }
+      //else if (ch == sinstr) {
+      //    // check for numbers/digit are formatted using single quote
+      //    pidx = idx - 1;
+      //    if (pidx && (data[pidx] >= '0' && data[pidx] <= '9')
+      //                  || ((data[pidx] >= 'A' || data[pidx] >= 'a') && (data[pidx] <= 'F' || data[pidx] >= 'f'))) {
+      //        ++idx;
+      //        continue;
+      //    }
 
-          if (data[idx + 1] == '\\' && data[idx + 2] == '0' && data[idx + 3] == sinstr) {
-              idx += 4;
-              continue;
-          }
+      //    if (data[idx + 1] == '\\' && data[idx + 2] == '0' && data[idx + 3] == sinstr) {
+      //        idx += 4;
+      //        continue;
+      //    }
 
-          if (!dblstrcnt) {
-              if (!sglstrcnt) {
-                ++sglstrcnt;
-                instr = !instr;
-              }
-              else {
-                --sglstrcnt;
-                instr = !instr;
-              }
-          }
-      }
+      //    if (!dblstrcnt) {
+      //        if (!sglstrcnt) {
+      //          ++sglstrcnt;
+      //          instr = !instr;
+      //        }
+      //        else {
+      //          --sglstrcnt;
+      //          instr = !instr;
+      //        }
+      //    }
+      //}
       ++idx;
       continue;
     }

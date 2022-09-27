@@ -1385,11 +1385,14 @@ void UnwrappedLineFormatter::formatFirstToken(
     if (RootToken.isOneOf(tok::l_brace, tok::r_brace, tok::kw_case,
                           tok::kw_default))
       Indent += Style.IndentWidth;
-  } else if (Line.First->Tok.is(tok::identifier) && Line.Last->Tok.is(tok::comment)
-      && Line.First->NewlinesBefore && Line.First->LbraceCount && Line.First->Previous == nullptr) {
+  } else if ((Line.First->Tok.is(tok::identifier) || (Line.First->Tok.is(tok::l_brace) && Line.First->Next && Line.First->Next->Tok.is(tok::identifier)))
+      && Line.Last->Tok.is(tok::comment)
+      && Line.First->NewlinesBefore
+      && Line.First->LbraceCount
+      && Line.First->Previous == nullptr) {
 
     if (!Indent && !Line.First->IsInFunctionDefinitionScope)
-        Indent += Style.IndentWidth;
+        Indent = Style.IndentWidth;
   }
 
   // Preprocessor directives get indented before the hash only if specified
