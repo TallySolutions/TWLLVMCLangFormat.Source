@@ -142,6 +142,18 @@ const tooling::Replacements &WhitespaceManager::generateReplacements() {
 }
 */
 
+bool WhitespaceManager::IsConditionBlock(const FormatToken *tkn)
+{
+    while (tkn) {
+        if (tkn->Tok.isOneOf(tok::kw_if, tok::kw_while, tok::kw_do, tok::kw_for))
+            return true;
+
+        tkn = tkn->Previous;
+    }
+
+    return false;
+}
+
 void WhitespaceManager::calculateLineBreakInformation() {
   Changes[0].PreviousEndOfTokenColumn = 0;
   Change *LastOutsideTokenChange = &Changes[0];
@@ -1322,7 +1334,7 @@ void WhitespaceManager::columnarizeNoDiscardOrNoReturnOrTemplate() {
     else if (MyTok->is(tok::identifier) && MyTok->Previous
         && MyTok->Previous->isOneOf(tok::amp, tok::ampamp, tok::star)
         && MyTok->Previous->Previous && MyTok->Previous->Previous->is(tok::identifier)
-        && MyTok->LparenCount) {
+        && MyTok->LparenCount && !IsConditionBlock(MyTok->Previous->Previous)) {
       Changes[i].Spaces = 1;
     }
 

@@ -173,6 +173,10 @@ public:
   };
 
 private:
+
+  /// TALLY: Is code in condition block.
+  bool IsConditionBlock(const FormatToken *tkn);
+
   /// Calculate \c IsTrailingComment, \c TokenLength for the last tokens
   /// or token parts in a line and \c PreviousEndOfTokenColumn and
   /// \c EscapedNewlineColumn for the first tokens or token parts in a line.
