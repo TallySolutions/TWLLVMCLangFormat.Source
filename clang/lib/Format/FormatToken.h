@@ -663,12 +663,41 @@ struct FormatToken {
       }
 
       if (isdtor) {
-          if (MyPrev->getPreviousNonComment() && MyPrev->getPreviousNonComment()->getPreviousNonComment()) {
-              StringRef clsnm(MyPrev->getPreviousNonComment()->getPreviousNonComment()->TokenText);
-              bool isEql = clsnm.equals(TokenText);
+          bool isTemplateClassIndicator = false;
 
-              return (isEql);
-          }
+          do {
+              MyPrev = MyPrev->getPreviousNonComment();
+
+              if (MyPrev) {
+                  if (MyPrev->isOneOf(tok::coloncolon, tok::coloncolon))
+                      continue;
+                  else if (MyPrev->is(tok::greater)) {
+                      isTemplateClassIndicator = true;
+                      continue;
+                  }
+                  else if (MyPrev->is(tok::less)) {
+                      if (!isTemplateClassIndicator)
+                          return false;
+
+                      MyPrev = MyPrev->getPreviousNonComment();
+
+                      if (MyPrev && MyPrev->is(tok::identifier)) {
+                          StringRef clsnm(TokenText);
+
+                          return (clsnm.equals(TokenText));
+                      }
+                  }
+                  else if (MyPrev->is(tok::identifier)) {
+                      StringRef clsnm(TokenText);
+
+                      if (clsnm.equals(TokenText))
+                          return true;
+
+                      if (!isTemplateClassIndicator)
+                          return false;
+                  }
+              }
+          } while (MyPrev);
 
           return false;
       }
