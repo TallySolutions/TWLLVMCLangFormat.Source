@@ -410,7 +410,6 @@ static bool MissingNotBraces(StringRef BufStr) {
   const char * data = BufStr.data();
 
   const char doustr   {'"'};
-  const char sinstr   {'\''};
   const char l_curly  {'{'};
   const char l_square {'['};
   const char l_curve  {'('};
@@ -422,7 +421,6 @@ static bool MissingNotBraces(StringRef BufStr) {
   int dblstrcnt       {};   //
   int sglstrcnt       {};   //
   int idx             {};
-  int pidx {};
 
   while (data[idx] != '\0') {
 

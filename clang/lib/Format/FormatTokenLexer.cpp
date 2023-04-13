@@ -1057,14 +1057,18 @@ void FormatTokenLexer::readRawToken(FormatToken &Tok) {
   if (Tok.is(tok::comment) && (Tok.TokenText == "// clang-format on" ||
                                Tok.TokenText == "/* clang-format on */")) {
     FormattingDisabled = false;
+    FormatToken::sCodeInFormatOffRegion = false;
   }
-
-  Tok.Finalized = FormattingDisabled;
 
   if (Tok.is(tok::comment) && (Tok.TokenText == "// clang-format off" ||
                                Tok.TokenText == "/* clang-format off */")) {
     FormattingDisabled = true;
+    FormatToken::sCodeInFormatOffRegion = true;
   }
+
+  Tok.Finalized = FormattingDisabled;
+  Tok.CodeInFormatOffRegion = FormatToken::sCodeInFormatOffRegion;
+
 }
 
 void FormatTokenLexer::resetLexer(unsigned Offset) {

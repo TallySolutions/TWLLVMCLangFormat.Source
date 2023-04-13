@@ -1124,10 +1124,17 @@ unsigned UnwrappedLineFormatter::format(
 
     /// TALLY : Ignore the lines that we dont want to format. Currently  template based friend class.
     ///          Line containing string literal. Hence for these, we do not need to employ clang-format off 
-    if (Line && Line->First &&  
+    if (Line && Line->First &&
         ((Line->startsWith (tok::hash) || Line->InPPDirective) ||
          Line->First->TokenText.equals("TW_CHECK_UDT_SIZE"))) {
         markFinalized (Line->First);
+    }
+
+    if (Line->First->CodeInFormatOffRegion) {
+
+      Line->First->Finalized = true;
+      NextLine = Joiner.getNextMergedLine(DryRun, IndentTracker);
+      continue;
     }
 
     const AnnotatedLine &TheLine = *Line;

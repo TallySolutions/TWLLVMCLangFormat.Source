@@ -409,6 +409,10 @@ struct FormatToken {
   /// TALLY: If this token in part of content inside arrow braces of expression of type template<...>
   bool IsInTemplateLine = false;
 
+  /// TALLY: If the code is in clang off region then no formatting applied
+  static bool sCodeInFormatOffRegion;
+  bool CodeInFormatOffRegion;
+
   // TALLY: Previous non-comment token is
   bool prevNonCommIs(tok::TokenKind Kind) const {
       FormatToken* prevNonComm = getPreviousNonComment();
@@ -1809,5 +1813,7 @@ private:
 
 } // namespace format
 } // namespace clang
+
+bool clang::format::FormatToken::sCodeInFormatOffRegion = false;
 
 #endif
