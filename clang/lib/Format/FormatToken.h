@@ -655,7 +655,7 @@ struct FormatToken {
       const FormatToken * MyPrev = getPreviousNonComment();
       bool isdtor {};
 
-      if (MyPrev) {
+      if (MyPrev && !MyPrev->is(tok::kw_constexpr)) {
           isdtor = MyPrev->is(tok::tilde);
 
           if (!isdtor)
@@ -719,7 +719,8 @@ struct FormatToken {
   // TALLY: Helper function
   bool isConstructor() const {
       const FormatToken* MyPrev = getPreviousNonComment();
-      if (MyPrev) {
+
+      if (MyPrev && !MyPrev->is(tok::kw_constexpr)) {
           return false;
       }
 

@@ -997,6 +997,10 @@ unsigned ContinuationIndenter::getNewLineColumn(const LineState &State) {
     return (Style.IndentWidth * State.Line->First->IndentLevel) +
            Style.IndentWidth;
 
+  if (NextNonComment->isOneOf (tok::l_brace, tok::r_brace)
+      && NextNonComment->BlockKind == BK_Block
+      && Current.IsInFunctionDefinitionScope)
+      return Style.ContinuationIndentWidth;
   if (NextNonComment->is(tok::l_brace) && NextNonComment->BlockKind == BK_Block)
     return Current.NestingLevel == 0 ? State.FirstIndent
                                      : State.Stack.back().Indent;
@@ -1159,6 +1163,11 @@ unsigned ContinuationIndenter::getNewLineColumn(const LineState &State) {
       NextNonComment->isBinaryOperator() && State.Stack.back().UnindentOperator)
     return State.Stack.back().Indent - NextNonComment->Tok.getLength() -
            NextNonComment->SpacesRequiredBefore;
+  if (PreviousNonComment->is (tok::kw_constexpr) && Current.Next
+      && (Current.Next->isOneOf (tok::coloncolon, tok::l_paren))
+      && (!(Current.IsClassScope || Current.IsEnumScope
+          || Current.IsStructScope || Current.IsUnionScope)))
+      return 0;
   if (State.Stack.back().Indent == State.FirstIndent && PreviousNonComment &&
       !PreviousNonComment->isOneOf(tok::r_brace, TT_CtorInitializerComma))
     // Ensure that we fall back to the continuation indent width instead of

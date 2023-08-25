@@ -1401,6 +1401,28 @@ void UnwrappedLineFormatter::formatFirstToken(
     if (!Indent && !Line.First->IsInFunctionDefinitionScope)
         Indent = Style.IndentWidth;
   }
+  else if (!Indent && Line.First->Tok.is(tok::identifier) && Line.First->Next
+             && Line.First->Next->Tok.is(tok::colon) && Line.First->IsInFunctionDefinitionScope)
+    Indent = Style.IndentWidth;// Style.TabWidth * Line.First->LbraceCount; //.IndentWidth; // it is a label
+  else if (Line.Last->Tok.is(tok::comment)
+           && Line.First->NewlinesBefore
+           && Line.First->LbraceCount
+           && Line.First->Previous == nullptr
+           && (Indent < ((Line.First->LbraceCount - Line.First->RbraceCount) * Style.TabWidth))) {
+
+    Indent = (Line.First->LbraceCount - Line.First->RbraceCount) * Style.TabWidth;
+  }
+  else if (Line.First->IsDatatype && Line.First->IsInFunctionDefinitionScope
+             && (Indent < ((Line.First->LbraceCount - 1) * Style.TabWidth)))
+    Indent = (Line.First->LbraceCount - 1) * Style.TabWidth;
+  else if (Line.First->IsInFunctionDefinitionScope && Line.First->is(tok::identifier)
+           && Indent < (Line.First->LbraceCount - Line.First->RbraceCount) * Style.TabWidth
+           && Indent == Style.IndentWidth)
+    Indent = (Line.First->LbraceCount - Line.First->RbraceCount) * Style.TabWidth;
+  else if (!Indent && Line.First->IsInFunctionDefinitionScope && Line.First->is(tok::r_brace)
+           && Indent < Style.IndentWidth
+           && (Line.First->LbraceCount - Line.First->RbraceCount) * Style.TabWidth)
+    Indent = (Line.First->LbraceCount - Line.First->RbraceCount) * Style.TabWidth;
 
   // Preprocessor directives get indented before the hash only if specified
   if (Style.IndentPPDirectives != FormatStyle::PPDIS_BeforeHash &&

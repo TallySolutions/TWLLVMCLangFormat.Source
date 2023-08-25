@@ -1485,6 +1485,9 @@ void WhitespaceManager::columnarizeIdentifierTokens() {
             if (MyTok->Previous && MyTok->Previous->is(tok::l_brace) && MyTok->Next && !MyTok->Next->is(tok::comment)) {
                 Changes[i].Spaces = 0;
             }
+            else if (MyTok->Previous && MyTok->Previous->is(tok::coloncolon) && MyTok->is(tok::identifier)) {
+                Changes[i].Spaces = 0;
+            }
             else {
                 Changes[i].Spaces = pad + lenDiff;
             }
