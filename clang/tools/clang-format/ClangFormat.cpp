@@ -410,6 +410,7 @@ static bool MissingNotBraces(StringRef BufStr) {
   const char * data = BufStr.data();
 
   const char doustr   {'"'};
+  const char single   {'\''};
   const char l_curly  {'{'};
   const char l_square {'['};
   const char l_curve  {'('};
@@ -417,7 +418,6 @@ static bool MissingNotBraces(StringRef BufStr) {
   const char r_square {']'};
   const char r_curve  {')'};
   bool instr          {false};    // in string
-  // TODO: quot within string need to be handled
   int dblstrcnt       {};   //
   int sglstrcnt       {};   //
   int idx             {};
@@ -428,7 +428,6 @@ static bool MissingNotBraces(StringRef BufStr) {
 
     // ignore comment line
     if (!instr && ch == '/') {
-
       ch = data[++idx];
       if (ch == '/') { // skip till we reach at "\n" or end of string '\0'
         while (data[++idx] != '\n' && data[idx] != '\0')
@@ -453,73 +452,38 @@ static bool MissingNotBraces(StringRef BufStr) {
       }
     }    // comment check section end
 
-    // Ignore if braces are part of string
-    if ((ch == doustr /*|| ch == sinstr*/)) {
-
-      if (ch == doustr) {
-          if (!dblstrcnt) {
-              if (!sglstrcnt) {
-                ++dblstrcnt;
-                instr = !instr;
-              }
-          }
-          else {
-            --dblstrcnt;
-            instr = !instr;
-          }
-
-      }
-      //else if (ch == sinstr) {
-      //    // check for numbers/digit are formatted using single quote
-      //    pidx = idx - 1;
-      //    if (pidx && (data[pidx] >= '0' && data[pidx] <= '9')
-      //                  || ((data[pidx] >= 'A' || data[pidx] >= 'a') && (data[pidx] <= 'F' || data[pidx] >= 'f'))) {
-      //        ++idx;
-      //        continue;
-      //    }
-
-      //    if (data[idx + 1] == '\\' && data[idx + 2] == '0' && data[idx + 3] == sinstr) {
-      //        idx += 4;
-      //        continue;
-      //    }
-
-      //    if (!dblstrcnt) {
-      //        if (!sglstrcnt) {
-      //          ++sglstrcnt;
-      //          instr = !instr;
-      //        }
-      //        else {
-      //          --sglstrcnt;
-      //          instr = !instr;
-      //        }
-      //    }
-      //}
-      ++idx;
-      continue;
+    // ignore anything in single or double quotes
+    // if single-quote, double quote and braces are inside single or double quote then move forward
+    if ((ch == single && (data[idx + 2] == single))
+        || (ch == doustr && (data[idx + 2] == doustr))) {
+        idx += 3;
+        if (data[idx] == single || data[idx] == doustr)
+            ++idx;
+        continue;
+    } else if (ch == single && data[idx + 1] == '\\' && data[idx + 2] == doustr && data[idx + 3] == single) {
+        idx += 4;
+        continue;
     }
 
-    if (instr) {
+    // Ignore whatever is part of string
+    if (ch == doustr) {
+            char pch;
 
+      ++idx;
+      while (data[idx] != doustr) {
+        pch = data[idx];
+        ++idx;
+        if (pch == '\\' && data[idx] == doustr)
+            ++idx;
+
+        continue;
+      }
       ++idx;
       continue;
     }
 
     // template support to be added
     if ((ch == l_curly || ch == l_square || ch == l_curve)) { //  TODO: || ch == l_angle
-
-        // TODO: if template reference then analyse
-        //if (ch == l_angle) {
-        //    TemplateCheckError ErrVal ;
-
-        //    if (!IsTemplateReference(data, ++idx, ErrVal)) {
-
-        //        if (ErrVal == TemplateCheckError::BracesMismatch)
-        //            return false;
-        //    }
-
-        //    continue;
-        //}
-
         braces.push(ch);
     }
     else if (ch == r_curly || ch == r_square || ch == r_curve) {    // tempalte bracket to be handled.
