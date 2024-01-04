@@ -1113,7 +1113,7 @@ void WhitespaceManager::columnarizeDeclarationSpecifierTokens() {
         if (MyTok->is(tok::kw_const) && PrevTok && PrevTok->is(tok::r_paren))
             continue;
 
-        // Filter out the template token since they lie in a seperate line itself.
+        // Filter out the template token since they lie in a separate line itself.
         if (MyTok->isAfterNoDiscardOrNoReturnOrTemplate(dummy))
             continue;
 
@@ -1150,6 +1150,11 @@ void WhitespaceManager::columnarizeDeclarationSpecifierTokens() {
             // len=5
             if (MyTok->is(tok::kw_const)) {
                 MyLine->LastSpecifierPadding = 3;
+                if (PrevTok && PrevTok->isPointerOrRef()) {
+                    MyLine->LastSpecifierPadding += 1;
+                    Changes[i].Spaces = MyLine->LastSpecifierPadding;
+                }
+
                 if (!PrevTok && (MyLine->MightBeFunctionDecl || MyTok->IsStructScope)) {
                     Changes[i].Spaces += MyLine->LastSpecifierPadding + 1;
                     Changes[i].StartOfTokenColumn += 4;
@@ -1477,6 +1482,7 @@ void WhitespaceManager::columnarizeIdentifierTokens() {
             continue;
 
         FormatToken* NextTok = MyTok->getNextNonCommentNonConst();
+        FormatToken* PrevTok = MyTok->getPreviousNonComment();
 
         if (MyTok->isMemberVarNameInDecl()) {
 
@@ -1500,25 +1506,22 @@ void WhitespaceManager::columnarizeIdentifierTokens() {
             }
         }
         else if (MyTok->isFunctionNameAndPrevIsPointerOrRefOrDatatype() && !MyTok->IsInFunctionDefinitionScope) {
-            size_t lenDiff = MaxDatatypeLen - MyTok->PrevTokenSizeForColumnarization;
-            Changes[i].Spaces = pad + lenDiff;
-            int j = i + 1;
-
-            size_t tokSize = ((StringRef)MyTok->TokenText).size();
-            MaxMemberNameLen = MaxMemberNameLen < tokSize ? tokSize : MaxMemberNameLen;
-
-            while (j < Changes.size() && Changes[j].NewlinesBefore == 0) {
-                Changes [j].StartOfTokenColumn += lenDiff;
-                ++j;
-            }
+            size_t tokSize = adjectIdentifierLocation (pad, i, MyTok);
 
             if (NextTok)
                 NextTok->PrevTokenSizeForColumnarization = tokSize;
         }
         else if (MyTok->isConstructor()) {
-            Changes[i].Spaces = MaxSpecifierTabs * Style.TabWidth + MaxDatatypeLen + pad;
-            size_t tokSize = ((StringRef)MyTok->TokenText).size();
-            MaxMemberNameLen = MaxMemberNameLen < tokSize ? tokSize : MaxMemberNameLen;
+            size_t tokSize = 0;
+
+            if (PrevTok && PrevTok->is(tok::kw_constexpr)) {
+                tokSize = adjectIdentifierLocation (pad, i, MyTok, true);
+            }
+            else {
+                Changes[i].Spaces = MaxSpecifierTabs * Style.TabWidth + MaxDatatypeLen + pad;
+                tokSize = ((StringRef)MyTok->TokenText).size();
+                MaxMemberNameLen = MaxMemberNameLen < tokSize ? tokSize : MaxMemberNameLen;
+            }
 
             if (NextTok)
                 NextTok->PrevTokenSizeForColumnarization = tokSize;
@@ -2105,6 +2108,30 @@ unsigned WhitespaceManager::appendTabIndent(std::string &Text, unsigned Spaces,
     Spaces -= Tabs * Style.TabWidth;
   }
   return Spaces;
+}
+
+size_t WhitespaceManager::adjectIdentifierLocation (unsigned pad, unsigned idx, const FormatToken * tkn, bool isConstructor)
+{
+    static const StringRef lparanthese ("(");
+    size_t lenDiff = MaxDatatypeLen - tkn->PrevTokenSizeForColumnarization;
+    int j = idx + 1;
+
+    if (isConstructor)
+        Changes[idx].Spaces = MaxSpecifierTabs * Style.TabWidth + MaxDatatypeLen + pad - (Changes[idx - 1].Spaces + Changes[idx - 1].TokenLength);
+    else if (tkn->Previous && tkn->Previous->is(tok::kw_const) && tkn->Next && tkn->Next->TokenText.equals(lparanthese))
+        Changes[idx].Spaces += pad;// > lenDiff ? pad - lenDiff : lenDiff - pad;
+    else
+        Changes[idx].Spaces = pad + lenDiff;
+
+    size_t tokSize = ((StringRef)tkn->TokenText).size();
+    MaxMemberNameLen = MaxMemberNameLen < tokSize ? tokSize : MaxMemberNameLen;
+
+    while (j < Changes.size() && Changes[j].NewlinesBefore == 0) {
+        Changes[j].StartOfTokenColumn += lenDiff;
+        ++j;
+    }
+
+    return tokSize;
 }
 
 } // namespace format

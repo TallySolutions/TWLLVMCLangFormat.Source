@@ -638,8 +638,16 @@ struct FormatToken {
 
   // TALLY: Helper function
   bool isFunctionNameAndPrevIsPointerOrRefOrDatatype() const {
-      FormatToken* MyPrev = getPreviousNonComment();
-      return (isFunctionAndNextLeftParen() && MyPrev != nullptr && MyPrev->isPointerOrRefOrDatatypeOrKeyword());
+      FormatToken * MyPrev = getPreviousNonComment();
+
+      if (MyPrev != nullptr && MyPrev->isPointerOrRefOrDatatypeOrKeyword())
+          return isFunctionAndNextLeftParen();
+      else if (MyPrev != nullptr) {
+          return (isFunctionAndNextLeftParen() && MyPrev->is(tok::kw_const) && MyPrev->Previous && MyPrev->Previous->isPointerOrRef());
+      }
+
+      return false;
+      //return (isFunctionAndNextLeftParen() && MyPrev != nullptr && MyPrev->isPointerOrRefOrDatatypeOrKeyword());
   }
 
   // TALLY: Helper function
@@ -724,7 +732,10 @@ struct FormatToken {
           return false;
       }
 
-      if (IsClassScope) {
+      const FormatToken * MyNext = getNextNonComment ();
+      static const StringRef funbrace ("(");
+
+      if (IsClassScope && MyNext && MyNext->TokenText.equals(funbrace)) {
           return (ClassScopeName.equals (TokenText));
       }
 

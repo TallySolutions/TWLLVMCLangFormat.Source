@@ -274,6 +274,8 @@ private:
   unsigned appendTabIndent(std::string &Text, unsigned Spaces,
                            unsigned Indentation);
 
+  size_t adjectIdentifierLocation (unsigned pad, unsigned idx, const FormatToken * tkn, bool isConstructor = false);
+
   SmallVector<Change, 16> Changes;
   const SourceManager &SourceMgr;
   tooling::Replacements Replaces;
