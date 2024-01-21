@@ -1362,7 +1362,9 @@ void WhitespaceManager::columnarizeNoDiscardOrNoReturnOrTemplate() {
           Changes[i].Spaces = 0;
 
           next = next->getNextNonComment();
-          if (next && (next->TokenText.startswith("nodiscard") || next->TokenText.startswith("noreturn"))) {
+          if (next && (next->TokenText.startswith("nodiscard")
+              || next->TokenText.startswith("noreturn")
+              || next->TokenText.startswith("maybe_unused"))) {
 
             ++i;
             Changes[i].StartOfTokenColumn += MaxSpecifierTabs * Style.TabWidth;
@@ -1508,9 +1510,20 @@ void WhitespaceManager::columnarizeIdentifierTokens() {
         else if (MyTok->isFunctionNameAndPrevIsPointerOrRefOrDatatype() && !MyTok->IsInFunctionDefinitionScope) {
             size_t tokSize = adjectIdentifierLocation (pad, i, MyTok);
 
+            if (MyTok->is(tok::kw_operator)) {
+                NextTok = NextTok->Next;
+                ++i;
+            }
+
             if (NextTok)
                 NextTok->PrevTokenSizeForColumnarization = tokSize;
         }
+        //else if (MyTok->is(tok::kw_operator)) {
+        //    size_t tokSize = adjectIdentifierLocation (pad, i, MyTok);
+        //    NextTok = NextTok->Next;
+        //    if (NextTok)
+        //        NextTok->PrevTokenSizeForColumnarization = tokSize;
+        //}
         else if (MyTok->isConstructor()) {
             size_t tokSize = 0;
 
@@ -1588,6 +1601,12 @@ void WhitespaceManager::columnarizeLParenTokensAndSplitArgs() {
                 && MyTok->Previous->Previous && MyTok->Previous->Previous->is(tok::star)) {
             size_t lenDiff = MaxGlobalVarNameLen - PrevTok->ColumnWidth;
             Changes[i].Spaces = 1 + lenDiff;
+            insideargs = false;
+        }
+        else if (MyTok->is(tok::l_brace) && PrevTok && PrevTok->is(tok::identifier)
+                && MyTok->Previous->Previous && MyTok->Previous->Previous->is(tok::kw_operator)) {
+            size_t lenDiff = MaxGlobalVarNameLen - PrevTok->ColumnWidth;
+            Changes[i].Spaces = pad + lenDiff;
             insideargs = false;
         }
 
@@ -2124,6 +2143,13 @@ size_t WhitespaceManager::adjectIdentifierLocation (unsigned pad, unsigned idx, 
         Changes[idx].Spaces = pad + lenDiff;
 
     size_t tokSize = ((StringRef)tkn->TokenText).size();
+
+    if (tkn->is(tok::kw_operator)) {
+        tokSize += tkn->Next->ColumnWidth;
+        Changes[idx + 1].Spaces = 0; // TODO : Vivek changed from -1 to 0
+        ++j;
+    }
+
     MaxMemberNameLen = MaxMemberNameLen < tokSize ? tokSize : MaxMemberNameLen;
 
     while (j < Changes.size() && Changes[j].NewlinesBefore == 0) {

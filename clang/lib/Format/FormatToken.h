@@ -482,7 +482,8 @@ struct FormatToken {
               startOfName = strcmp(TokenText.begin(), "WINAPI") == 0;
           }
       }
-      bool rc = (startOfName || is(TT_FunctionDeclarationName) || is(tok::kw_operator));
+      bool rc = (startOfName || is(TT_FunctionDeclarationName) || is(tok::kw_operator)
+                 || (Previous && Previous->is(tok::kw_operator)));
       return rc;
   }
 
@@ -493,7 +494,7 @@ struct FormatToken {
 
   // TALLY: Helper function
   bool isLeftParen() const {
-      return is(tok::l_paren);
+      return is(tok::l_paren) || (Previous && Previous->is(tok::kw_operator)); //  && (isOperatorFunction() || is(tok::l_paren)))
   }
 
   // TALLY: Helper function
@@ -505,7 +506,8 @@ struct FormatToken {
               TokenText.startswith("MALLOC") ||
               TokenText.startswith("WINAPI") ||
               TokenText.startswith("nodiscard") || 
-              TokenText.startswith("noreturn"));
+              TokenText.startswith("noreturn") ||
+              TokenText.startswith("maybe_unused"));
   }
 
   // TALLY: Helper function
@@ -643,7 +645,9 @@ struct FormatToken {
       if (MyPrev != nullptr && MyPrev->isPointerOrRefOrDatatypeOrKeyword())
           return isFunctionAndNextLeftParen();
       else if (MyPrev != nullptr) {
-          return (isFunctionAndNextLeftParen() && MyPrev->is(tok::kw_const) && MyPrev->Previous && MyPrev->Previous->isPointerOrRef());
+          return (isFunctionAndNextLeftParen() &&
+              ((MyPrev->is(tok::kw_const) && MyPrev->Previous && MyPrev->Previous->isPointerOrRef()) ||
+              (MyPrev->is(tok::kw_operator))));
       }
 
       return false;
@@ -1340,6 +1344,20 @@ struct FormatToken {
                : nullptr;
   }
 
+  FormatToken * MarkOperatorOverloadAsFunction () {
+      FormatToken * nxttkn = Next;
+
+      while (nxttkn && nxttkn->isOperatorFunction () && !nxttkn->is(tok::l_paren)) {
+          nxttkn->IsFunctionName = true;
+          nxttkn->Tok.setKind(tok::identifier);
+          nxttkn = nxttkn->Next;
+      }
+
+      if (nxttkn->is(tok::l_paren) == true)
+          return nxttkn->Previous;
+
+      return nxttkn;
+  }
 private:
   // Disallow copying.
   FormatToken(const FormatToken &) = delete;
@@ -1372,6 +1390,49 @@ private:
   }
 
   TokenType Type = TT_Unknown;
+
+  bool isOperatorFunction () const
+  {
+      switch (Tok.getKind()) {
+          case tok::amp:
+          case tok::ampamp:
+          case tok::ampequal:
+          case tok::star:
+          case tok::starequal:
+          case tok::plus:
+          case tok::plusplus:
+          case tok::plusequal:
+          case tok::minus:
+          case tok::arrow:
+          case tok::minusequal:
+          case tok::minusminus:
+          case tok::tilde:
+          case tok::exclaim:
+          case tok::exclaimequal:
+          case tok::slash:
+          case tok::slashequal:
+          case tok::percent:
+          case tok::percentequal:
+          case tok::less:
+          case tok::lessless:
+          case tok::lessequal:
+          case tok::spaceship:
+          case tok::greater:
+          case tok::greatergreater:
+          case tok::greaterequal:
+          case tok::greatergreaterequal:
+          case tok::caret:
+          case tok::caretequal:
+          case tok::pipe:
+          case tok::pipepipe:
+          case tok::pipeequal:
+          case tok::equal:
+          case tok::equalequal:
+              return true;
+          default:
+              return false;
+      }
+  }
 };
 
 class ContinuationIndenter;

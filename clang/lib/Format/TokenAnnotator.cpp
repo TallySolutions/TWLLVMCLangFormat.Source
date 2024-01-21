@@ -2447,8 +2447,19 @@ void TokenAnnotator::walkLine1(AnnotatedLine& Line) {
                     
                     IsClassScope = true;
 
-                    const FormatToken* Next = MyToken->getNextNonComment();
+                    const FormatToken * Next = MyToken->getNextNonComment();
                     if (Next) {
+
+                        if (Next->is(tok::kw_alignas) && Next->Next && Next->Next->is(tok::l_paren)
+                            && Next->Next->Next && Next->Next->Next->Next && Next->Next->Next->Next->is(tok::r_paren)
+                            && Next->Next->Next->Next->Next) {
+
+                            Next = Next->Next->Next->Next->Next;
+                            if (Next->Next && (Next->Next->isOneOf(tok::l_brace, tok::colon) ||
+                                    (Next->Next->is(tok::kw___is_final) && Next->Next->Next && Next->Next->Next->isOneOf(tok::l_brace, tok::colon))))
+                                Next = Next;
+                        }
+
                         ClassScopeName = Next->TokenText;
                     }
                 }
@@ -2549,7 +2560,7 @@ void TokenAnnotator::walkLine1(AnnotatedLine& Line) {
                             MyPrev = MyPrev->Previous->Previous;
 
                             if (MyPrev && MyPrev->is(tok::greater)) {
-                            
+
                                 int arrowcount = 0;
                                 do {
                                    if (MyPrev->is(tok::greater))
@@ -2557,12 +2568,12 @@ void TokenAnnotator::walkLine1(AnnotatedLine& Line) {
 
                                    if (MyPrev->is(tok::less))
                                        --arrowcount;
-                                    
+
                                    MyPrev = MyPrev->Previous;
                                 } while (arrowcount && MyPrev);
                             }
                             else if (MyPrev && MyPrev->is(tok::r_paren)) {
-                            
+
                                 int bracketcount = 0;
                                 do {
                                    if (MyPrev->is(tok::r_paren))
@@ -2570,7 +2581,7 @@ void TokenAnnotator::walkLine1(AnnotatedLine& Line) {
 
                                    if (MyPrev->is(tok::l_paren))
                                        --bracketcount;
-                                    
+
                                    MyPrev = MyPrev->Previous;
                                 } while (bracketcount && MyPrev);
                             }
@@ -2685,8 +2696,9 @@ void TokenAnnotator::walkLine2(AnnotatedLine& Line) {
                 break;
         }
 
-        bool nonAlignasLParen = MyToken && MyToken->is(tok::l_paren) && MyToken->Previous && !MyToken->Previous->is(tok::kw_alignas);
-        if (MyToken && (MyToken->isOneOf(tok::equal, TT_BinaryOperator, TT_UnaryOperator) || MyToken->isMemberAccess() || nonAlignasLParen)) {
+        // TALLY to distinguish '(' from 'operator=('
+        if (MyToken && (MyToken->isOneOf(tok::equal, TT_BinaryOperator, TT_UnaryOperator) || MyToken->isMemberAccess())
+                && (MyToken->Previous && !(MyToken->Previous->is(tok::kw_operator)))) {
             FormatToken* Next = MyToken->getNextNonCommentNonConst();
             while (Next) {
                 Next->IsRhsToken = true;
@@ -2756,8 +2768,13 @@ void TokenAnnotator::walkLine2(AnnotatedLine& Line) {
 
                 // Function name
                 if ((MyToken->isFunctionName() && Next && Next->is(tok::l_paren) && MyToken->Previous && MyToken->Previous->isDatatype() == false) || 
-                    (MyToken->isFunctionName() && Next && Next->is(tok::l_paren) && (MyToken->IsClassScope || MyToken->IsStructScope))) {
+                    (MyToken->isFunctionName() && Next && Next->is(tok::l_paren) && (MyToken->IsClassScope || MyToken->IsStructScope)) ||
+                    MyToken->isFunctionName() && MyToken->is(tok::kw_operator) && (MyToken->IsClassScope || MyToken->IsStructScope)) {
                     MyToken->IsFunctionName = true;
+
+                    if (MyToken->is(tok::kw_operator))
+                        MyToken = MyToken->MarkOperatorOverloadAsFunction();
+
                     DtToken->IsDatatype = true;
                 }
                 // Variable name
